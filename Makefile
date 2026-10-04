@@ -1,9 +1,9 @@
 .PHONY: test lint check
 
 test:
-	python -m pytest
+	uv run pytest
 
 lint:
-	python -m ruff check .
+	uv run ruff check .
 
 check: lint test

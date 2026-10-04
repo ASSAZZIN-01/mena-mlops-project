@@ -1,0 +1,70 @@
+seed: 42
+
+paths:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  reports: reports
+
+download:
+  sources:
+    - name: ar_res_reviews
+      kind: huggingface
+      dataset: hadyelsahar/ar_res_reviews
+      split: train
+      columns:
+        text: text
+        label: polarity
+      labels:
+        kind: binary
+    - name: shein_reviews
+      kind: huggingface
+      dataset: Ruqiya/Arabic_Reviews_of_SHEIN
+      split: train
+      columns:
+        text: text
+        label: label
+      labels:
+        kind: rating
+    - name: arabic_customer_reviews
+      kind: kaggle
+      dataset: mohamedramadan2040/arabic-customer-reviews
+      columns:
+        text: review_description
+        label: rating
+
+labels:
+  output: [negative, neutral, positive]
+  mappings:
+    positive: positive
+    negative: negative
+    neutral: neutral
+  rating:
+    "1": negative
+    "2": negative
+    "3": neutral
+    "4": positive
+    "5": positive
+  binary:
+    "0": negative
+    "1": positive
+  signed:
+    "-1": negative
+    "0": neutral
+    "1": positive
+
+cleaning:
+  min_text_length: 2
+  remove_diacritics: false
+  remove_tatweel: true
+
+split:
+  debug: true
+  outer_folds: 10
+  debug_outer_fold: 0
+  debug_inner_folds: 4
+  debug_train_folds: [0, 1]
+  debug_validation_folds: [2]
+  debug_test_folds: [3]
+  full_test_fold: 9
+  full_validation_fold: 8

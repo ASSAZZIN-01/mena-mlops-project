@@ -1,0 +1,22 @@
+stages:
+  download:
+    cmd: uv run python scripts/run_data_pipeline.py --config configs/data.yaml --stage download
+    deps:
+      - configs/data.yaml
+      - scripts/run_data_pipeline.py
+      - src/mena_mlops/data_pipeline.py
+    outs:
+      - data/raw
+  process:
+    cmd: uv run python scripts/run_data_pipeline.py --config configs/data.yaml --stage process
+    deps:
+      - configs/data.yaml
+      - scripts/run_data_pipeline.py
+      - src/mena_mlops/data_pipeline.py
+      - data/raw
+    outs:
+      - data/interim/cleaned.parquet
+      - data/processed
+    metrics:
+      - reports/split_report.json:
+          cache: false
