@@ -1,8 +1,8 @@
 schema: '2.0'
 stages:
   download:
-    cmd: python scripts/run_data_pipeline.py --config configs/data.yaml --stage 
-      download
+    cmd: uv run python scripts/run_data_pipeline.py --config configs/data.yaml 
+      --stage download
     deps:
     - path: configs/data.yaml
       hash: md5
@@ -23,8 +23,8 @@ stages:
       size: 6505941
       nfiles: 3
   process:
-    cmd: python scripts/run_data_pipeline.py --config configs/data.yaml --stage 
-      process
+    cmd: uv run python scripts/run_data_pipeline.py --config configs/data.yaml 
+      --stage process
     deps:
     - path: configs/data.yaml
       hash: md5
