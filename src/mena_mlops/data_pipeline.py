@@ -196,15 +196,20 @@ def normalize_sources(
 
 
 def deduplicate(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
-    conflicts = (
-        frame.groupby("text", dropna=False)["label"].nunique().gt(1).sum()
-    )
-    duplicate_rows = int(frame.duplicated("text", keep="first").sum())
-    cleaned = frame.drop_duplicates("text", keep="first").reset_index(drop=True)
+    labels_per_text = frame.groupby("text", dropna=False)["label"].nunique()
+    conflicting_texts = labels_per_text[labels_per_text > 1].index
+    conflict_mask = frame["text"].isin(conflicting_texts)
+    conflict_rows = int(conflict_mask.sum())
+    without_conflicts = frame.loc[~conflict_mask]
+    duplicate_rows = int(without_conflicts.duplicated("text", keep="first").sum())
+    cleaned = without_conflicts.drop_duplicates(
+        "text", keep="first"
+    ).reset_index(drop=True)
     return cleaned, {
         "input_rows": len(frame),
+        "conflicting_rows_removed": conflict_rows,
+        "conflicting_texts_removed": len(conflicting_texts),
         "duplicate_rows_removed": duplicate_rows,
-        "conflicting_texts": int(conflicts),
         "output_rows": len(cleaned),
     }
 

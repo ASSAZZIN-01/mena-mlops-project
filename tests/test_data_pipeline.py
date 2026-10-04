@@ -51,18 +51,20 @@ def test_normalize_frame_maps_ratings_and_generates_ids() -> None:
 def test_deduplicate_removes_repeated_text_and_reports_conflicts() -> None:
     frame = pd.DataFrame(
         {
-            "id": ["1", "2", "3"],
-            "text": ["نص", "نص", "نص مختلف"],
-            "label": ["positive", "positive", "negative"],
-            "source": ["a", "b", "a"],
+            "id": ["1", "2", "3", "4"],
+            "text": ["نص", "نص", "نص مختلف", "نص مختلف"],
+            "label": ["positive", "positive", "negative", "positive"],
+            "source": ["a", "b", "a", "b"],
         }
     )
 
     result, report = deduplicate(frame)
 
-    assert len(result) == 2
+    assert len(result) == 1
+    assert result.iloc[0]["text"] == "نص"
     assert report["duplicate_rows_removed"] == 1
-    assert report["conflicting_texts"] == 0
+    assert report["conflicting_rows_removed"] == 2
+    assert report["conflicting_texts_removed"] == 1
 
 
 def test_full_split_is_reproducible_and_keeps_source_label_strata() -> None:

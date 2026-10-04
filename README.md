@@ -71,6 +71,10 @@ and one test fold. Set `split.debug` to `false` for the full-data baseline:
 fold 8 is validation, fold 9 is test, and the remaining eight folds are
 training.
 
+Exact normalized-text duplicates with conflicting labels are removed entirely;
+they are not assigned an arbitrary surviving label. Other exact duplicates keep
+one row after this conflict filter.
+
 ## Course reference
 
 The course examples and handbooks used to shape this scaffold are kept

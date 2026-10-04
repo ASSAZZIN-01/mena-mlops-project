@@ -14,8 +14,8 @@ stages:
       size: 81
     - path: src/mena_mlops/data_pipeline.py
       hash: md5
-      md5: 0bbbd5a31df580312d1e3b79c51f6533
-      size: 10534
+      md5: 056e670f57852699cfcedac1309b4c2b
+      size: 10837
     outs:
     - path: data/raw
       hash: md5
@@ -41,19 +41,19 @@ stages:
       size: 81
     - path: src/mena_mlops/data_pipeline.py
       hash: md5
-      md5: 0bbbd5a31df580312d1e3b79c51f6533
-      size: 10534
+      md5: 056e670f57852699cfcedac1309b4c2b
+      size: 10837
     outs:
     - path: data/interim/cleaned.parquet
       hash: md5
-      md5: e4beb34f4515c2175caf7163661fe0d2
-      size: 5645178
+      md5: 873edb8f4137eb2f243369836dafa420
+      size: 5636929
     - path: data/processed
       hash: md5
-      md5: a5a7bc931603b506e7dd111cf5071764.dir
-      size: 595900
+      md5: 296593f20c16f946a95b478f169e41e0.dir
+      size: 590181
       nfiles: 3
     - path: reports/split_report.json
       hash: md5
-      md5: 15c6a99c3c1ebd6408ab6e0edff73e15
-      size: 980
+      md5: 1899da66abcb53bbf609e99c8237a8fc
+      size: 1025
