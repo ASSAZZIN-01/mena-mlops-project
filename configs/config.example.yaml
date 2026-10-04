@@ -1,0 +1,5 @@
+# Copy to configs/config.yaml for local experiments.
+# Keep credentials and machine-specific paths out of Git.
+project:
+  name: mena-mlops-project
+  random_seed: 42
