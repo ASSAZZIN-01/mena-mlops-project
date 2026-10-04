@@ -1,6 +1,6 @@
 stages:
   download:
-    cmd: python scripts/run_data_pipeline.py --config configs/data.yaml --stage download
+    cmd: uv run python scripts/run_data_pipeline.py --config configs/data.yaml --stage download
     deps:
       - configs/data.yaml
       - scripts/run_data_pipeline.py
@@ -8,7 +8,7 @@ stages:
     outs:
       - data/raw
   process:
-    cmd: python scripts/run_data_pipeline.py --config configs/data.yaml --stage process
+    cmd: uv run python scripts/run_data_pipeline.py --config configs/data.yaml --stage process
     deps:
       - configs/data.yaml
       - scripts/run_data_pipeline.py

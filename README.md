@@ -24,14 +24,11 @@ mena-mlops-project/
 
 ## Getting started
 
-The project targets Python 3.11 or newer. Create a virtual environment with
-your preferred tool, then install the package and development dependencies:
+The project targets Python 3.11 or newer and uses `uv` for locked,
+reproducible environments:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+uv sync
 ```
 
 Run the checks with:
