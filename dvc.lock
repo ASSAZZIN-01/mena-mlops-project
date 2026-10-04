@@ -1,0 +1,59 @@
+schema: '2.0'
+stages:
+  download:
+    cmd: python scripts/run_data_pipeline.py --config configs/data.yaml --stage 
+      download
+    deps:
+    - path: configs/data.yaml
+      hash: md5
+      md5: 2f67f0af7cd149c044cbf5a5e47819de
+      size: 1351
+    - path: scripts/run_data_pipeline.py
+      hash: md5
+      md5: 16822e69deb13eb3427ad75fbd0fabe6
+      size: 81
+    - path: src/mena_mlops/data_pipeline.py
+      hash: md5
+      md5: 0bbbd5a31df580312d1e3b79c51f6533
+      size: 10534
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: dce32fcdd86a4fe9d2a93057ae0f8444.dir
+      size: 6505941
+      nfiles: 3
+  process:
+    cmd: python scripts/run_data_pipeline.py --config configs/data.yaml --stage 
+      process
+    deps:
+    - path: configs/data.yaml
+      hash: md5
+      md5: 2f67f0af7cd149c044cbf5a5e47819de
+      size: 1351
+    - path: data/raw
+      hash: md5
+      md5: dce32fcdd86a4fe9d2a93057ae0f8444.dir
+      size: 6505941
+      nfiles: 3
+    - path: scripts/run_data_pipeline.py
+      hash: md5
+      md5: 16822e69deb13eb3427ad75fbd0fabe6
+      size: 81
+    - path: src/mena_mlops/data_pipeline.py
+      hash: md5
+      md5: 0bbbd5a31df580312d1e3b79c51f6533
+      size: 10534
+    outs:
+    - path: data/interim/cleaned.parquet
+      hash: md5
+      md5: e4beb34f4515c2175caf7163661fe0d2
+      size: 5645178
+    - path: data/processed
+      hash: md5
+      md5: a5a7bc931603b506e7dd111cf5071764.dir
+      size: 595900
+      nfiles: 3
+    - path: reports/split_report.json
+      hash: md5
+      md5: 15c6a99c3c1ebd6408ab6e0edff73e15
+      size: 980
