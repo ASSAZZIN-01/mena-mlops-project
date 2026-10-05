@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 from pathlib import Path
@@ -126,6 +127,33 @@ def log_evaluation(prefix: str, metrics: dict[str, Any]) -> None:
         )
 
 
+def file_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def log_dataset_inputs(
+    frames: dict[str, Any], data_dir: Path
+) -> dict[str, str]:
+    digests = {}
+    for split, frame in frames.items():
+        path = data_dir / f"{split}.parquet"
+        digest = file_digest(path)
+        dataset = mlflow.data.from_pandas(
+            frame,
+            source=str(path),
+            name=f"mena-mlops-{split}",
+            digest=digest[:32],
+            targets="label",
+        )
+        mlflow.log_input(
+            dataset,
+            context=f"{split}_dataset",
+            tags={"pipeline": "dvc", "split": split},
+        )
+        digests[split] = digest
+    return digests
+
+
 def run_training(config_path: Path) -> str:
     load_dotenv()
     config = load_yaml(config_path)
@@ -204,6 +232,13 @@ def run_training(config_path: Path) -> str:
             {split: split_summary(frame) for split, frame in frames.items()},
             "data_summary.json",
         )
+        dataset_digests = log_dataset_inputs(frames, data_dir)
+        mlflow.log_params(
+            {
+                f"{split}_dataset_digest": digest
+                for split, digest in dataset_digests.items()
+            }
+        )
         best_validation_f1 = -1.0
         output_dir = Path(config["paths"]["output_dir"])
         for epoch in range(int(train_config["epochs"])):
@@ -263,6 +298,17 @@ def run_training(config_path: Path) -> str:
         )
         mlflow.log_artifact(str(report_path), artifact_path="reports")
         mlflow.log_artifacts(str(output_dir), artifact_path="model")
+        mlflow.transformers.log_model(
+            transformers_model={"model": model, "tokenizer": tokenizer},
+            name="registered_model",
+            registered_model_name=str(config["mlflow"]["registered_model_name"]),
+            task="text-classification",
+            pip_requirements=[
+                "torch==2.5.1",
+                "transformers==5.18.0",
+                "safetensors>=0.4",
+            ],
+        )
         return run.info.run_id
 
 

@@ -19,6 +19,7 @@ mlflow:
   experiment_name: mena-mlops-arabert
   tracking_uri: sqlite:///mlflow.db
   run_name: arabert-debug-baseline
+  registered_model_name: mena-mlops-arabert
 
 paths:
   data_config: configs/data.yaml
