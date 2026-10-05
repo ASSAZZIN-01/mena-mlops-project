@@ -1,0 +1,27 @@
+seed: 42
+
+model:
+  name: aubmindlab/bert-base-arabertv2
+  num_labels: 3
+
+training:
+  max_length: 128
+  batch_size: 4
+  eval_batch_size: 8
+  gradient_accumulation_steps: 2
+  epochs: 2
+  learning_rate: 0.00002
+  weight_decay: 0.01
+  device: auto
+  fp16: true
+
+mlflow:
+  experiment_name: mena-mlops-arabert
+  tracking_uri: sqlite:///mlflow.db
+  run_name: arabert-debug-baseline
+
+paths:
+  data_config: configs/data.yaml
+  data_dir: data/processed
+  output_dir: models/arabert-debug
+  report_dir: reports/training

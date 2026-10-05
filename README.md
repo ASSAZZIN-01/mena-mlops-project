@@ -83,3 +83,16 @@ outside this repository in
 Large data, model binaries, credentials, and local environment files are
 intentionally excluded from Git. Store secrets in environment variables or a
 secret manager and commit only sanitized configuration examples.
+
+## Training
+
+The debug training workflow uses AraBERT and records training plus validation,
+test, and per-source evaluation in one MLflow run:
+
+```bash
+uv run python -m mena_mlops.training.train
+```
+
+MLflow uses the local SQLite tracking database configured in
+`configs/training.yaml`; the database and generated artifacts are ignored by
+Git.
