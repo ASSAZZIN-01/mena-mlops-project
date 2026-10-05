@@ -6,13 +6,17 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "MENA MLOps Project Contributors" }]
 dependencies = [
+    "accelerate>=1.0",
     "datasets>=3.0",
     "kaggle>=1.6",
+    "mlflow>=2.16",
     "pandas>=2.2",
     "pyarrow>=17.0",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
     "scikit-learn>=1.5",
+    "torch==2.5.1",
+    "transformers>=4.45",
 ]
 
 [dependency-groups]
@@ -29,6 +33,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
@@ -38,3 +46,6 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }

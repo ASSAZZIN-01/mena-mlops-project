@@ -34,4 +34,6 @@ models/*
 
 .dvc/
 mlruns/
+mlflow.db
+mlflow.db-journal
 wandb/
