@@ -1,12 +1,24 @@
 name: CI
 
 on:
-  push:
   pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   checks:
+    name: checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,5 +27,9 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
       - run: uv sync --locked
-      - run: uv run make check
+      - name: Run Ruff
+        run: uv run ruff check .
+      - name: Run tests
+        run: uv run pytest

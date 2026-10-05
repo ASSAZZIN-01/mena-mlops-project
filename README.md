@@ -37,6 +37,11 @@ Run the checks with:
 make check
 ```
 
+Pull requests targeting `main` run the same locked-environment Ruff and pytest
+checks in GitHub Actions. The workflow cancels superseded runs for the same
+branch and exposes a single `checks` status that can be configured as a
+required check in repository rules.
+
 ## Data pipeline
 
 The data contract and all source mappings live in one file:
