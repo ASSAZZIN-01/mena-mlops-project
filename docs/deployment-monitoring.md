@@ -47,8 +47,19 @@ changed without changing model code:
 STABLE_WEIGHT=80 CANDIDATE_WEIGHT=20 docker compose up -d nginx
 ```
 
+Or use the validated canary control script:
+
+```bash
+uv run python scripts/canary.py --candidate 20
+uv run python scripts/canary.py --rollback
+```
+
 Set `STABLE_MODEL_PATH`, `CANDIDATE_MODEL_PATH`, and the corresponding model
 version variables to compare two different artifacts.
+
+The script recreates only the gateway. Zero-weight upstreams are omitted from
+the generated Nginx configuration because Nginx rejects `weight=0`. Rollback
+therefore sets candidate traffic to 0% and stable traffic to 100% safely.
 
 ## Release strategy
 

@@ -24,6 +24,30 @@
           "legendFormat": "{{deployment}}"
         }
       ]
+    },
+    {
+      "title": "HTTP 5xx error rate",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "sum by (deployment) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum by (deployment) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\"}[5m]))",
+          "legendFormat": "{{deployment}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percentunit"}}
+    },
+    {
+      "title": "Service availability",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "expr": "min by (deployment) (up{job=~\"model-stable|model-candidate\"})",
+          "legendFormat": "{{deployment}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1}}
     }
   ]
 }
