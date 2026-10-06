@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: model-stable
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["model-stable:8000"]
+        labels:
+          deployment: stable
+  - job_name: model-candidate
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["model-candidate:8000"]
+        labels:
+          deployment: candidate

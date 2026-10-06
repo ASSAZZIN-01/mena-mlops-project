@@ -1,8 +1,9 @@
 # Deployment and monitoring
 
 The deployment work uses two independently started instances of the same
-FastAPI service. Each instance loads one immutable model directory and exposes
-its `MODEL_VERSION` through `/health`, `/predict`, and Prometheus labels.
+BentoML service. Each instance loads one immutable model directory and exposes
+its `MODEL_VERSION` through `/health` and `/predict`. Prometheus scrapes each
+instance separately so stable and candidate traffic can be compared.
 
 ## Run one local instance
 
@@ -12,7 +13,9 @@ from the training output directory:
 ```bash
 MODEL_PATH=models/arabert-debug \
 MODEL_VERSION=baseline-v1 \
-uv run python scripts/serve.py
+uv run bentoml serve \
+  mena_mlops.serving.bento_service:SentimentService \
+  --host 0.0.0.0 --port 8001
 ```
 
 The API exposes:
@@ -20,6 +23,28 @@ The API exposes:
 - `GET /health` for readiness checks.
 - `POST /predict` with `{"text": "..."}` for inference.
 - `GET /metrics` for Prometheus scraping.
+
+## Start the local deployment stack
+
+Docker Desktop with WSL integration is required:
+
+```bash
+docker compose up --build
+```
+
+The public model endpoint is available at `http://localhost:8080`. Grafana is
+available at `http://localhost:3000` and Prometheus at
+`http://localhost:9090`.
+
+The default local traffic split is 95% stable and 5% candidate. It can be
+changed without changing model code:
+
+```bash
+STABLE_WEIGHT=80 CANDIDATE_WEIGHT=20 docker compose up -d nginx
+```
+
+Set `STABLE_MODEL_PATH`, `CANDIDATE_MODEL_PATH`, and the corresponding model
+version variables to compare two different artifacts.
 
 ## Release strategy
 
@@ -35,6 +60,25 @@ diagnosis. The model registry alias and router configuration must change
 together; a version number embedded in application code is not a rollback
 mechanism.
 
-No production promotion is enabled by this branch yet. The first milestone is
-to make the health, prediction, version, and metrics contracts testable before
-adding Docker, Nginx, and dashboard automation.
+No production promotion is enabled by this branch yet. Promotion remains gated
+until health, prediction, version, and monitoring contracts are validated.
+
+## Evidently drift reports
+
+The drift job derives privacy-safe features from review text and can optionally
+include prediction labels and confidence values. Raw review text is never
+written into Prometheus labels or the drift summary.
+
+Provide newline-delimited JSON monitoring windows with a `text` field:
+
+```bash
+uv run python scripts/run_drift.py \
+  --reference reports/monitoring/reference.jsonl \
+  --current reports/monitoring/current.jsonl \
+  --output-dir reports/drift
+```
+
+The job writes an HTML report for investigation, a JSON report for detailed
+inspection, and `drift_summary.json` for automation. Current drift coverage
+includes input and prediction drift; verified labels will be added as a
+separate quality evaluation gate because they arrive later than predictions.

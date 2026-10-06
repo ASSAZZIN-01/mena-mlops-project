@@ -1,0 +1,10 @@
+service: "mena_mlops.serving.bento_service:SentimentService"
+include:
+  - "src/mena_mlops/**"
+python:
+  packages:
+    - "torch==2.5.1"
+    - "transformers>=4.45"
+    - "pydantic>=2"
+docker:
+  python_version: "3.13"
