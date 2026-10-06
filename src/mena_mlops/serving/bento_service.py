@@ -23,7 +23,8 @@ class SentimentService:
         self.predictor = _load_predictor()
 
     @bentoml.api
-    def predict(self, payload: PredictionRequest) -> PredictionResponse:
+    def predict(self, text: str) -> PredictionResponse:
+        payload = PredictionRequest(text=text)
         label, probabilities = self.predictor.predict(payload.text)
         return PredictionResponse(
             label=label,

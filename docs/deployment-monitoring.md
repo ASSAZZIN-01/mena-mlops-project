@@ -18,11 +18,15 @@ uv run bentoml serve \
   --host 0.0.0.0 --port 8001
 ```
 
-The API exposes:
+The public gateway exposes:
 
-- `GET /health` for readiness checks.
+- `GET /health` for readiness checks (mapped to BentoML's `/healthz`).
 - `POST /predict` with `{"text": "..."}` for inference.
 - `GET /metrics` for Prometheus scraping.
+
+BentoML also exposes its service API directly inside the containers. The
+custom `health` method is a POST endpoint; the gateway intentionally uses
+BentoML's standard GET `/healthz` endpoint for load-balancer readiness.
 
 ## Start the local deployment stack
 
