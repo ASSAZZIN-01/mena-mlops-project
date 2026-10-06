@@ -8,20 +8,24 @@ authors = [{ name = "MENA MLOps Project Contributors" }]
 dependencies = [
     "accelerate>=1.0",
     "datasets>=3.0",
+    "fastapi>=0.142.2",
     "kaggle>=1.6",
     "mlflow>=2.16",
     "pandas>=2.2",
+    "prometheus-client>=0.26.0",
     "pyarrow>=17.0",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
     "scikit-learn>=1.5",
     "torch==2.5.1",
     "transformers>=4.45",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
     "dvc>=3.0",
+    "httpx>=0.28.1",
     "pytest>=8.0",
     "ruff>=0.6",
 ]
