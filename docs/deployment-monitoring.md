@@ -75,6 +75,28 @@ uv run python scripts/run_batch_inference.py \
 Each output record contains `prediction`, JSON-encoded `probabilities`,
 `model_version`, and an ISO-8601 `predicted_at` timestamp.
 
+## Redis Streams inference
+
+The Compose stack includes Redis on port `6379`. The streaming consumer reads
+review events from `reviews:input`, publishes predictions to
+`reviews:predictions`, and acknowledges an input only after the prediction has
+been written successfully:
+
+```bash
+REDIS_URL=redis://localhost:6379/0 \
+uv run python scripts/run_stream_consumer.py
+```
+
+Publish an input event from another terminal:
+
+```bash
+redis-cli XADD reviews:input '*' text 'هذا المنتج ممتاز' event_id review-1
+redis-cli XRANGE reviews:predictions - +
+```
+
+Failed messages are logged and remain pending in the consumer group so they
+can be retried instead of being silently discarded.
+
 Set `STABLE_MODEL_PATH`, `CANDIDATE_MODEL_PATH`, and the corresponding model
 version variables to compare two different artifacts.
 
