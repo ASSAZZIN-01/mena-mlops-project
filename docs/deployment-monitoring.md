@@ -159,3 +159,12 @@ The job writes an HTML report for investigation, a JSON report for detailed
 inspection, and `drift_summary.json` for automation. Current drift coverage
 includes input and prediction drift; verified labels will be added as a
 separate quality evaluation gate because they arrive later than predictions.
+
+For Airflow, mount the project into the scheduler/worker environment and copy
+the DAG from `dags/evidently_drift.py` into Airflow's DAG directory. The DAG
+runs daily at 02:00 UTC and accepts these environment variables:
+
+- `MENA_PROJECT_ROOT`
+- `MENA_DRIFT_REFERENCE`
+- `MENA_DRIFT_CURRENT`
+- `MENA_DRIFT_OUTPUT`
