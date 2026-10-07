@@ -32,6 +32,7 @@ dev = [
     "locust>=2.45",
     "pytest>=8.0",
     "ruff>=0.6",
+    "streamlit>=1.40",
 ]
 
 [build-system]

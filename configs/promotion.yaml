@@ -1,0 +1,7 @@
+quality_gate:
+  minimum_macro_f1: 0.60
+  minimum_improvement: 0.01
+  minimum_class_f1:
+    negative: 0.50
+    neutral: 0.30
+    positive: 0.50

@@ -183,3 +183,24 @@ thresholds are configured in `configs/feedback.yaml`:
 Incorrect reviews require the reviewer to select the corrected class. The
 reviewed records remain separate from validation and test data and can be
 merged into the training split only after all configured thresholds are met.
+
+Run the reviewer interface locally with:
+
+```bash
+FEEDBACK_DB=data/feedback/reviewed.db \
+uv run streamlit run scripts/feedback_ui.py
+```
+
+The Redis inference consumer automatically adds predictions whose maximum
+class probability falls within the configured confidence window to this
+feedback database.
+
+Check whether enough reviewed data exists to start retraining:
+
+```bash
+uv run python scripts/check_retraining_gate.py
+```
+
+Candidate promotion must also pass the verified-label quality gate in
+`configs/promotion.yaml`. It requires a minimum macro-F1, improvement over
+the stable model, and minimum F1 floors for each sentiment class.

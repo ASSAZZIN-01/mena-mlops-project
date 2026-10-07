@@ -6,10 +6,13 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 from redis import Redis
 from redis.exceptions import ResponseError
+
+from mena_mlops.feedback import FeedbackStore
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,6 +76,9 @@ class RedisInferenceConsumer:
         output_stream: str = "reviews:predictions",
         group: str = "mena-inference",
         consumer: str = "worker-1",
+        feedback_store: FeedbackStore | None = None,
+        feedback_min_confidence: float = 0.25,
+        feedback_max_confidence: float = 0.75,
     ) -> None:
         self.client = client
         self.predictor = predictor
@@ -80,6 +86,9 @@ class RedisInferenceConsumer:
         self.output_stream = output_stream
         self.group = group
         self.consumer = consumer
+        self.feedback_store = feedback_store
+        self.feedback_min_confidence = feedback_min_confidence
+        self.feedback_max_confidence = feedback_max_confidence
 
     def ensure_group(self) -> None:
         """Create the consumer group once, without hiding connection errors."""
@@ -116,6 +125,19 @@ class RedisInferenceConsumer:
                         self.predictor,
                     )
                     self.client.xadd(self.output_stream, prediction)
+                    if self.feedback_store is not None:
+                        probabilities = json.loads(prediction["probabilities"])
+                        confidence = max(probabilities.values())
+                        if (
+                            self.feedback_min_confidence
+                            <= confidence
+                            <= self.feedback_max_confidence
+                        ):
+                            self.feedback_store.add_uncertain(
+                                review.text,
+                                prediction["prediction"],
+                                confidence,
+                            )
                     self.client.xack(self.input_stream, self.group, message_id)
                     acknowledged += 1
                 except (TypeError, ValueError, RuntimeError):
@@ -131,6 +153,9 @@ def create_consumer() -> RedisInferenceConsumer:
 
     from mena_mlops.serving.app import _load_predictor
 
+    feedback_store = FeedbackStore(
+        Path(os.getenv("FEEDBACK_DB", "data/feedback/reviewed.db"))
+    )
     return RedisInferenceConsumer(
         Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0")),
         _load_predictor(),
@@ -138,4 +163,11 @@ def create_consumer() -> RedisInferenceConsumer:
         output_stream=os.getenv("REDIS_OUTPUT_STREAM", "reviews:predictions"),
         group=os.getenv("REDIS_CONSUMER_GROUP", "mena-inference"),
         consumer=os.getenv("REDIS_CONSUMER_NAME", "worker-1"),
+        feedback_store=feedback_store,
+        feedback_min_confidence=float(
+            os.getenv("FEEDBACK_MIN_CONFIDENCE", "0.25")
+        ),
+        feedback_max_confidence=float(
+            os.getenv("FEEDBACK_MAX_CONFIDENCE", "0.75")
+        ),
     )
