@@ -204,3 +204,21 @@ uv run python scripts/check_retraining_gate.py
 Candidate promotion must also pass the verified-label quality gate in
 `configs/promotion.yaml`. It requires a minimum macro-F1, improvement over
 the stable model, and minimum F1 floors for each sentiment class.
+
+When the feedback thresholds are reached, launch candidate retraining:
+
+```bash
+uv run python scripts/run_retraining.py \
+  --database data/feedback/reviewed.db \
+  --output-dir models/arabert-candidate
+```
+
+After evaluating the stable and candidate reports on trusted labels, promote
+only through the quality gate:
+
+```bash
+uv run python scripts/promote_candidate.py \
+  --stable reports/quality/stable.json \
+  --candidate reports/quality/candidate.json \
+  --candidate-percent 20
+```

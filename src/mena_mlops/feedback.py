@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pandas as pd
+
 LABELS = ("negative", "neutral", "positive")
 
 
@@ -142,6 +144,24 @@ class FeedbackStore:
             counts.get(label, 0) >= required
             for label, required in thresholds.items()
         )
+
+    def export_reviewed(self, path: Path) -> int:
+        """Export reviewed examples for training without pending records."""
+
+        with self._connect() as connection:
+            frame = pd.read_sql_query(
+                """
+                SELECT id, text, reviewed_label AS label
+                FROM feedback
+                WHERE reviewed_label IS NOT NULL
+                ORDER BY id
+                """,
+                connection,
+            )
+        frame["source"] = "human_feedback"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_parquet(path, index=False)
+        return len(frame)
 
     def _get(self, item_id: int) -> FeedbackItem:
         with self._connect() as connection:
