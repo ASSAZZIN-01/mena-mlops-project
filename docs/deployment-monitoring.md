@@ -36,6 +36,11 @@ Docker Desktop with WSL integration is required:
 docker compose up --build
 ```
 
+The model services expose Docker health checks, and Nginx waits for both
+models to become healthy before starting. The first startup can therefore
+take a few seconds while the model artifacts load; use `docker compose ps` to
+confirm both model services are healthy.
+
 The public model endpoint is available at `http://localhost:8080`. Grafana is
 available at `http://localhost:3000` and Prometheus at
 `http://localhost:9090`.

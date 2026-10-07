@@ -7,6 +7,18 @@ services:
       MODEL_DEVICE: cpu
     volumes:
       - ${STABLE_MODEL_PATH:-./models/arabert-debug}:/models/stable:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8000/healthz", timeout=2)
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
 
   model-candidate:
     build: .
@@ -16,12 +28,26 @@ services:
       MODEL_DEVICE: cpu
     volumes:
       - ${CANDIDATE_MODEL_PATH:-./models/arabert-debug}:/models/candidate:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8000/healthz", timeout=2)
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
 
   nginx:
     image: nginx:1.27-alpine
     depends_on:
-      - model-stable
-      - model-candidate
+      model-stable:
+        condition: service_healthy
+      model-candidate:
+        condition: service_healthy
     environment:
       STABLE_WEIGHT: ${STABLE_WEIGHT:-95}
       CANDIDATE_WEIGHT: ${CANDIDATE_WEIGHT:-5}
@@ -35,8 +61,10 @@ services:
   prometheus:
     image: prom/prometheus:v3.5.0
     depends_on:
-      - model-stable
-      - model-candidate
+      model-stable:
+        condition: service_healthy
+      model-candidate:
+        condition: service_healthy
     ports:
       - "9090:9090"
     volumes:
