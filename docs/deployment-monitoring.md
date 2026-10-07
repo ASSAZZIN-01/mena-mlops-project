@@ -168,3 +168,18 @@ runs daily at 02:00 UTC and accepts these environment variables:
 - `MENA_DRIFT_REFERENCE`
 - `MENA_DRIFT_CURRENT`
 - `MENA_DRIFT_OUTPUT`
+
+## Human feedback and retraining thresholds
+
+Uncertain predictions can be persisted with `FeedbackStore` in
+`src/mena_mlops/feedback.py`. The default confidence window and review
+thresholds are configured in `configs/feedback.yaml`:
+
+- confidence between 25% and 75%;
+- 100 validated negative examples;
+- 20 validated neutral examples;
+- 100 validated positive examples.
+
+Incorrect reviews require the reviewer to select the corrected class. The
+reviewed records remain separate from validation and test data and can be
+merged into the training split only after all configured thresholds are met.
