@@ -61,6 +61,25 @@ The script recreates only the gateway. Zero-weight upstreams are omitted from
 the generated Nginx configuration because Nginx rejects `weight=0`. Rollback
 therefore sets candidate traffic to 0% and stable traffic to 100% safely.
 
+## Locust load testing
+
+Start the Docker stack first, then run the benchmark through the public Nginx
+gateway:
+
+```bash
+uv run bash scripts/run_load_test.sh 20 10 60s reports/locust/gateway
+```
+
+The generated CSV and HTML reports record request count, throughput, failures,
+median latency, p95, and p99 latency. The scenario also validates the semantic
+prediction response, so an HTTP 200 with an invalid label or probability
+distribution is marked as a failure.
+
+The first benchmark is a baseline, not an assumed capacity claim. Increase
+users gradually and record the highest load that satisfies the agreed service
+SLA. The course scenario is approximately 50,000 reviews per day, or 0.58
+requests per second on average; peak capacity must be measured separately.
+
 ## Release strategy
 
 The next deployment slice will run a stable and a candidate instance behind a
