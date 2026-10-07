@@ -59,6 +59,22 @@ uv run python scripts/canary.py --candidate 20
 uv run python scripts/canary.py --rollback
 ```
 
+## Batch inference
+
+Offline scoring accepts JSONL or Parquet files containing a required `text`
+column. Input fields are preserved and prediction metadata is appended:
+
+```bash
+uv run python scripts/run_batch_inference.py \
+  data/input/reviews.jsonl \
+  data/predictions/reviews.jsonl \
+  --model-path models/arabert-debug \
+  --model-version debug-v1
+```
+
+Each output record contains `prediction`, JSON-encoded `probabilities`,
+`model_version`, and an ISO-8601 `predicted_at` timestamp.
+
 Set `STABLE_MODEL_PATH`, `CANDIDATE_MODEL_PATH`, and the corresponding model
 version variables to compare two different artifacts.
 
