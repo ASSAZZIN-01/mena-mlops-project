@@ -1,0 +1,97 @@
+services:
+  model-stable:
+    build: .
+    environment:
+      MODEL_PATH: /models/stable
+      MODEL_VERSION: ${STABLE_MODEL_VERSION:-stable-v1}
+      MODEL_DEVICE: cpu
+    volumes:
+      - ${STABLE_MODEL_PATH:-./models/arabert-debug}:/models/stable:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8000/healthz", timeout=2)
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
+
+  model-candidate:
+    build: .
+    environment:
+      MODEL_PATH: /models/candidate
+      MODEL_VERSION: ${CANDIDATE_MODEL_VERSION:-candidate-v1}
+      MODEL_DEVICE: cpu
+    volumes:
+      - ${CANDIDATE_MODEL_PATH:-./models/arabert-debug}:/models/candidate:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8000/healthz", timeout=2)
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      model-stable:
+        condition: service_healthy
+      model-candidate:
+        condition: service_healthy
+    environment:
+      STABLE_WEIGHT: ${STABLE_WEIGHT:-95}
+      CANDIDATE_WEIGHT: ${CANDIDATE_WEIGHT:-5}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./deploy/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+      - ./deploy/nginx-entrypoint.sh:/docker-entrypoint-custom.sh:ro
+    entrypoint: ["/bin/sh", "/docker-entrypoint-custom.sh"]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    depends_on:
+      model-stable:
+        condition: service_healthy
+      model-candidate:
+        condition: service_healthy
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12

@@ -1,0 +1,50 @@
+groups:
+  - name: model-service
+    rules:
+      - alert: ModelServiceUnavailable
+        expr: up{job=~"model-stable|model-candidate"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Model service is unavailable
+          description: "{{ $labels.job }} is not being scraped by Prometheus."
+
+      - alert: CandidateHttpErrorRateHigh
+        expr: |
+          (
+            sum by (deployment) (
+              rate(bentoml_service_request_duration_seconds_count{
+                endpoint="/predict", http_response_code=~"5.."
+              }[5m])
+            )
+          /
+            sum by (deployment) (
+              rate(bentoml_service_request_duration_seconds_count{
+                endpoint="/predict"
+              }[5m])
+            )
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: HTTP error rate is high
+          description: "{{ $labels.deployment }} has more than 5% HTTP 5xx responses."
+
+      - alert: CandidateLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, deployment) (
+              rate(bentoml_service_request_duration_seconds_bucket{
+                endpoint="/predict"
+              }[5m])
+            )
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Model p95 latency is high
+          description: "{{ $labels.deployment }} p95 latency exceeds one second."
