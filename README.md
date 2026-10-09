@@ -1,8 +1,10 @@
 # MENA MLOps Project
 
-Project workspace for the MLOps Practitioner course. The implementation is
-organized as a reproducible machine-learning service and can grow from
-experimentation into training, serving, and monitoring.
+Project workspace for the MLOps Practitioner course. It provides a
+reproducible Arabic sentiment system with DVC data versioning, AraBERT
+training, MLflow tracking, BentoML serving, Nginx canaries, Redis Streams,
+Prometheus/Grafana monitoring, Evidently/PSI drift detection, human feedback,
+and gated retraining.
 
 ## Repository layout
 
@@ -21,6 +23,9 @@ mena-mlops-project/
 ├── Makefile
 └── pyproject.toml
 ```
+
+The complete system architecture is documented in
+[`docs/architecture.md`](docs/architecture.md).
 
 ## Getting started
 
@@ -101,3 +106,110 @@ uv run python -m mena_mlops.training.train
 MLflow uses the local SQLite tracking database configured in
 `configs/training.yaml`; the database and generated artifacts are ignored by
 Git.
+
+## Deployment and inference
+
+Start the production-shaped local stack:
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+The gateway is available at `http://localhost:8080`:
+
+```bash
+curl http://localhost:8080/health
+curl -X POST http://localhost:8080/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"هذا المنتج ممتاز"}'
+```
+
+Grafana is at `http://localhost:3000` and Prometheus is at
+`http://localhost:9090`. Canary traffic can be changed or rolled back with:
+
+```bash
+uv run python scripts/canary.py --candidate 20
+uv run python scripts/canary.py --rollback
+```
+
+Batch scoring supports JSONL and Parquet:
+
+```bash
+uv run python scripts/run_batch_inference.py \
+  data/input/reviews.jsonl data/predictions/reviews.jsonl
+```
+
+Redis Streams uses `reviews:input` and `reviews:predictions`:
+
+```bash
+uv run python scripts/run_stream_consumer.py
+redis-cli XADD reviews:input '*' text 'هذا المنتج ممتاز' event_id review-1
+```
+
+## Testing and monitoring
+
+Run the quality checks, including the model-quality baseline gate:
+
+```bash
+make check
+uv run python scripts/check_model_quality.py \
+  --metrics tests/fixtures/quality_metrics.json
+```
+
+Run a gateway load test:
+
+```bash
+uv run bash scripts/run_load_test.sh 20 10 60s reports/locust/gateway
+```
+
+Generate Evidently and PSI reports:
+
+```bash
+uv run python scripts/run_drift.py \
+  --reference reports/monitoring/reference.jsonl \
+  --current reports/monitoring/current.jsonl \
+  --output-dir reports/drift
+```
+
+The drift output includes `drift_summary.json`, `drift_report.html`, and
+Prometheus text-format `psi.prom`. PSI above `0.25` is treated as a drift
+alert by the Prometheus rules and Grafana dashboard.
+
+## Feedback and retraining
+
+Review uncertain predictions with:
+
+```bash
+FEEDBACK_DB=data/feedback/reviewed.db \
+uv run streamlit run scripts/feedback_ui.py
+```
+
+When class thresholds are reached, retrain a candidate:
+
+```bash
+uv run python scripts/run_retraining.py \
+  --database data/feedback/reviewed.db \
+  --output-dir models/arabert-candidate
+```
+
+Candidate promotion requires verified-label quality metrics:
+
+```bash
+uv run python scripts/promote_candidate.py \
+  --stable reports/quality/stable.json \
+  --candidate reports/quality/candidate.json
+```
+
+## CPU optimization
+
+Compare the original model with dynamic INT8 quantization:
+
+```bash
+uv run python scripts/benchmark_optimization.py \
+  --model-path models/arabert-debug \
+  --output reports/optimization.json
+```
+
+The benchmark records mean latency, p95 latency, and measured speedup. The
+final project benchmark table will be added after the optimization run.
