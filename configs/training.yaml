@@ -16,8 +16,9 @@ training:
   fp16: true
 
 mlflow:
-  experiment_name: mena-mlops-arabert
+  experiment_name: mena-mlops-arabert-gcs
   tracking_uri: sqlite:///mlflow.db
+  artifact_location: gs://mena-mlops-project-dvc/mlflow
   run_name: arabert-debug-baseline
   registered_model_name: mena-mlops-arabert
 
