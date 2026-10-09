@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+import numpy as np
 import torch
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
@@ -87,7 +88,55 @@ class TransformerPredictor:
         return label, values
 
 
-def _load_predictor() -> TransformerPredictor:
+@dataclass
+class OnnxPredictor:
+    """Run an ONNX deployment variant with the canonical tokenizer."""
+
+    model_path: Path
+    tokenizer_path: Path
+    model_version: str
+
+    def __post_init__(self) -> None:
+        from onnxruntime import InferenceSession
+
+        from mena_mlops.optimization import onnx_predict
+
+        self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_path)
+        self.session = InferenceSession(
+            str(self.model_path),
+            providers=["CPUExecutionProvider"],
+        )
+        self._onnx_predict = onnx_predict
+        raw_config = self.tokenizer.init_kwargs.get("model_max_length", 128)
+        self.max_length = min(int(raw_config), 128)
+        self.labels = {0: "negative", 1: "neutral", 2: "positive"}
+
+    def predict(self, text: str) -> tuple[str, dict[str, float]]:
+        logits = self._onnx_predict(
+            self.session,
+            self.tokenizer,
+            text,
+            max_length=self.max_length,
+        )
+        probabilities = torch.softmax(torch.from_numpy(np.asarray(logits)), dim=-1)
+        values = {
+            self.labels[index]: round(float(probability), 6)
+            for index, probability in enumerate(probabilities)
+        }
+        return max(values, key=values.get), values
+
+
+def _load_predictor() -> Predictor:
+    if os.getenv("MODEL_BACKEND", "pytorch").lower() == "onnx":
+        model_path = Path(os.environ["MODEL_ONNX_PATH"])
+        tokenizer_path = Path(
+            os.getenv("MODEL_TOKENIZER_PATH", str(model_path.parent))
+        )
+        return OnnxPredictor(
+            model_path=model_path,
+            tokenizer_path=tokenizer_path,
+            model_version=os.getenv("MODEL_VERSION", model_path.stem),
+        )
     model_path = Path(os.getenv("MODEL_PATH", "models/arabert-debug"))
     if not model_path.is_dir():
         raise RuntimeError(

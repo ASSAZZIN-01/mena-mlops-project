@@ -26,19 +26,20 @@ class SentimentGatewayUser(HttpUser):
 
     @task(10)
     def predict(self) -> None:
-        response = self.client.post(
+        with self.client.post(
             "/predict",
             json={"text": next(review_cycle)},
             name="POST /predict",
-        )
-        if response.status_code != 200:
-            response.failure(f"HTTP {response.status_code}: {response.text[:200]}")
-            return
-        try:
-            if not valid_prediction_response(response.json()):
-                response.failure("invalid prediction contract")
-        except (ValueError, TypeError) as error:
-            response.failure(f"invalid JSON response: {error}")
+            catch_response=True,
+        ) as response:
+            if response.status_code != 200:
+                response.failure(f"HTTP {response.status_code}: {response.text[:200]}")
+                return
+            try:
+                if not valid_prediction_response(response.json()):
+                    response.failure("invalid prediction contract")
+            except (ValueError, TypeError) as error:
+                response.failure(f"invalid JSON response: {error}")
 
     @task
     def health(self) -> None:

@@ -32,7 +32,10 @@ models/*
 *.pth
 *.bin
 
-.dvc/
+.dvc/*
+!.dvc/config
+.dvc/cache/
+.dvc/tmp/
 mlruns/
 mlflow.db
 mlflow.db-journal

@@ -205,7 +205,14 @@ def run_training(config_path: Path) -> str:
         weight_decay=float(train_config["weight_decay"]),
     )
     mlflow.set_tracking_uri(str(config["mlflow"]["tracking_uri"]))
-    mlflow.set_experiment(str(config["mlflow"]["experiment_name"]))
+    experiment_name = str(config["mlflow"]["experiment_name"])
+    artifact_location = config["mlflow"].get("artifact_location")
+    if artifact_location and mlflow.get_experiment_by_name(experiment_name) is None:
+        mlflow.create_experiment(
+            experiment_name,
+            artifact_location=str(artifact_location),
+        )
+    mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run(run_name=str(config["mlflow"]["run_name"])) as run:
         mlflow.log_params(

@@ -11,8 +11,11 @@ dependencies = [
     "datasets>=3.0",
     "evidently>=0.7",
     "fastapi>=0.142.2",
+    "google-cloud-storage>=2.18",
     "kaggle>=1.6",
     "mlflow>=2.16",
+    "numpy>=1.26",
+    "onnxruntime>=1.18",
     "pandas>=2.2",
     "prometheus-client>=0.26.0",
     "pyarrow>=17.0",
@@ -27,9 +30,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "dvc>=3.0",
+    "dvc[gs]>=3.0",
     "httpx>=0.28.1",
     "locust>=2.45",
+    "onnx>=1.16",
     "pytest>=8.0",
     "ruff>=0.6",
     "streamlit>=1.40",
