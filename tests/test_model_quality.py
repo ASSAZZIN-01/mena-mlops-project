@@ -1,6 +1,10 @@
 """Tests for the CI model-quality regression gate."""
 
-from mena_mlops.quality import check_optimization_quality, check_quality
+from mena_mlops.quality import (
+    check_optimization_quality,
+    check_quality,
+    select_optimization_variant,
+)
 
 
 def test_baseline_metrics_pass() -> None:
@@ -45,3 +49,27 @@ def test_optimization_rejects_drop_at_threshold() -> None:
         {"macro_f1": 0.5225, "mean_latency_ms": 17.0},
     )
     assert failures
+
+
+def test_optimization_selects_fastest_quality_eligible_variant() -> None:
+    selected = select_optimization_variant(
+        {
+            "fast-but-bad": {
+                "macro_f1": 0.5,
+                "mean_latency_ms": 10.0,
+                "p95_latency_ms": 20.0,
+            },
+            "int8": {
+                "macro_f1": 0.5462,
+                "mean_latency_ms": 17.0,
+                "p95_latency_ms": 24.0,
+            },
+            "fp32": {
+                "macro_f1": 0.5523,
+                "mean_latency_ms": 65.0,
+                "p95_latency_ms": 100.0,
+            },
+        },
+        {"macro_f1": 0.5523, "mean_latency_ms": 100.0},
+    )
+    assert selected == "int8"

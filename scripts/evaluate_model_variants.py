@@ -13,7 +13,10 @@ import torch
 from onnxruntime import InferenceSession
 
 from mena_mlops.optimization import benchmark_callable, onnx_predict
-from mena_mlops.quality import check_optimization_quality
+from mena_mlops.quality import (
+    check_optimization_quality,
+    select_optimization_variant,
+)
 from mena_mlops.serving.app import _load_predictor
 from mena_mlops.training.evaluation import evaluate_predictions
 
@@ -118,6 +121,34 @@ def main() -> None:
             "promotion_eligible": not failures,
             "quality_gate_failures": failures,
         }
+    candidates = {
+        name: {
+            "macro_f1": result["quality"]["macro_f1"],
+            "mean_latency_ms": result["latency"]["mean_ms"],
+            "p95_latency_ms": result["latency"]["p95_ms"],
+        }
+        for name, result in results.items()
+        if name != "pytorch"
+    }
+    selected = select_optimization_variant(
+        candidates,
+        baseline,
+        maximum_macro_f1_drop_percent=args.max_macro_f1_drop_percent,
+    )
+    results["selection"] = {
+        "ranking": [
+            name
+            for name, _ in sorted(
+                candidates.items(),
+                key=lambda item: (
+                    item[1]["mean_latency_ms"],
+                    item[1]["p95_latency_ms"],
+                ),
+            )
+        ],
+        "selected_variant": selected,
+        "maximum_macro_f1_drop_percent": args.max_macro_f1_drop_percent,
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(results, indent=2))
