@@ -33,3 +33,7 @@ jobs:
         run: uv run ruff check .
       - name: Run tests
         run: uv run pytest
+      - name: Enforce model-quality baseline
+        run: |
+          uv run python scripts/check_model_quality.py \
+            --metrics tests/fixtures/quality_metrics.json
