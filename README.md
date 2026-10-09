@@ -63,14 +63,16 @@ python scripts/run_data_pipeline.py --stage process
 Or reproduce the complete DVC pipeline:
 
 ```bash
-dvc repro
-dvc push
+export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/gcp-service-account.json
+uv run dvc pull
+uv run dvc repro
+uv run dvc push
 ```
 
 Raw downloads and generated datasets are tracked by DVC. The current default
-remote is a local cache at
-`/home/az-wsl/projects/mlops-course-ressources/mena-mlops-dvc-cache`; this can
-be replaced later with shared object storage without changing the pipeline.
+remote is the private Google Cloud Storage bucket
+`gs://mena-mlops-project-dvc/dvc`. Credentials are read from
+`GOOGLE_APPLICATION_CREDENTIALS` and are never committed.
 
 The default `debug: true` mode selects one outer fold from a stratified
 10-fold split and subdivides it into two training folds, one validation fold,
@@ -103,9 +105,11 @@ test, and per-source evaluation in one MLflow run:
 uv run python -m mena_mlops.training.train
 ```
 
-MLflow uses the local SQLite tracking database configured in
-`configs/training.yaml`; the database and generated artifacts are ignored by
-Git.
+MLflow uses local SQLite metadata configured in `configs/training.yaml`, while
+run artifacts are stored in
+`gs://mena-mlops-project-dvc/mlflow`. Set
+`GOOGLE_APPLICATION_CREDENTIALS` before training. The SQLite database and
+generated local artifacts are ignored by Git.
 
 ## Deployment and inference
 
