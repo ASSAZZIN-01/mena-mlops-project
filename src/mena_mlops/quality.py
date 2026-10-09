@@ -63,3 +63,28 @@ def check_optimization_quality(
             f"baseline {baseline_latency:.2f} ms"
         )
     return failures
+
+
+def select_optimization_variant(
+    variants: dict[str, dict[str, float]],
+    baseline: dict[str, float],
+    *,
+    maximum_macro_f1_drop_percent: float = 5.0,
+) -> str | None:
+    """Select the fastest quality-eligible variant, using p95 as a tie-breaker."""
+
+    ranked = sorted(
+        variants.items(),
+        key=lambda item: (
+            float(item[1]["mean_latency_ms"]),
+            float(item[1]["p95_latency_ms"]),
+        ),
+    )
+    for name, variant in ranked:
+        if not check_optimization_quality(
+            baseline,
+            variant,
+            maximum_macro_f1_drop_percent=maximum_macro_f1_drop_percent,
+        ):
+            return name
+    return None

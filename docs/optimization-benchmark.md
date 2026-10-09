@@ -22,8 +22,10 @@ within the configured 5% optimization tolerance.
 ONNX INT8 is the selected optimization candidate for the next canary
 comparison. Promotion uses the canonical PyTorch model as the baseline and
 allows a macro-F1 drop strictly below 5% when the variant improves mean
-latency. The PyTorch model remains the canonical training artifact, and INT8
-is promoted only as a deployment representation.
+latency. Eligible variants are ranked by mean latency and then p95 latency;
+the fastest eligible variant is selected. The PyTorch model remains the
+canonical training artifact, and INT8 is promoted only as a deployment
+representation.
 
 The artifacts and metrics are generated with:
 
