@@ -216,7 +216,8 @@ uv run python scripts/benchmark_optimization.py \
 ```
 
 The benchmark records mean latency, p95 latency, and measured speedup. The
-final project benchmark table will be added after the optimization run.
+completed ONNX comparison is documented in
+[`docs/optimization-benchmark.md`](docs/optimization-benchmark.md).
 ### Optimization variants
 
 Keep the canonical PyTorch model unchanged and build deployment variants from

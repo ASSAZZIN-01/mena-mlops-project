@@ -64,6 +64,12 @@ def export_onnx_model(
         truncation=True,
         max_length=max_length,
     )
+    input_names = [
+        name
+        for name in ("input_ids", "attention_mask", "token_type_ids")
+        if name in encoded
+    ]
+    dummy_inputs = tuple(encoded[name] for name in input_names)
     model.eval().cpu()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     class LogitsWrapper(torch.nn.Module):
@@ -77,9 +83,9 @@ def export_onnx_model(
     with torch.no_grad():
         torch.onnx.export(
             LogitsWrapper(model),
-            tuple(encoded.values()),
+            dummy_inputs,
             output_path,
-            input_names=list(encoded.keys()),
+            input_names=input_names,
             output_names=["logits"],
             dynamic_axes={
                 key: {0: "batch", 1: "sequence"}
