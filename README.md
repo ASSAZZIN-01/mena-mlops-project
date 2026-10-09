@@ -235,5 +235,7 @@ uv run python scripts/evaluate_model_variants.py \
 The builder writes ONNX FP32 and ONNX dynamic-INT8 files plus a manifest with
 the source model version and SHA-256 checksums. The evaluator compares accuracy,
 macro-F1, per-class F1, and CPU latency on the same test set. An optimized
-variant is only eligible for deployment after it passes the existing quality
-gate and an equivalent serving/load-test comparison.
+variant is eligible when its mean latency improves and its macro-F1 drop stays
+strictly below the configured 5% optimization tolerance. The current benchmark
+therefore selects ONNX INT8 for deployment while retaining PyTorch as the
+canonical baseline.

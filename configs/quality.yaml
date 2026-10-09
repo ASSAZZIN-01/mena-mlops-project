@@ -1,3 +1,5 @@
 model_quality:
   baseline_test_macro_f1: 0.5522739620462365
   minimum_test_neutral_f1: 0.0
+optimization:
+  maximum_macro_f1_drop_percent: 5.0

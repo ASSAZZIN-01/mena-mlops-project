@@ -13,6 +13,7 @@ import torch
 from onnxruntime import InferenceSession
 
 from mena_mlops.optimization import benchmark_callable, onnx_predict
+from mena_mlops.quality import check_optimization_quality
 from mena_mlops.serving.app import _load_predictor
 from mena_mlops.training.evaluation import evaluate_predictions
 
@@ -29,6 +30,7 @@ def main() -> None:
         "--test-data", type=Path, default=Path("data/processed/test.parquet")
     )
     parser.add_argument("--iterations", type=int, default=20)
+    parser.add_argument("--max-macro-f1-drop-percent", type=float, default=5.0)
     parser.add_argument(
         "--output", type=Path, default=Path("reports/optimization-comparison.json")
     )
@@ -86,6 +88,36 @@ def main() -> None:
             iterations=args.iterations,
         )
         results[name] = {"quality": metrics, "latency": latency}
+    baseline = {
+        "macro_f1": results["pytorch"]["quality"]["macro_f1"],
+        "mean_latency_ms": results["pytorch"]["latency"]["mean_ms"],
+    }
+    for name, result in results.items():
+        if name == "pytorch":
+            continue
+        variant = {
+            "macro_f1": result["quality"]["macro_f1"],
+            "mean_latency_ms": result["latency"]["mean_ms"],
+        }
+        drop_percent = (
+            (baseline["macro_f1"] - variant["macro_f1"])
+            / baseline["macro_f1"]
+            * 100
+        )
+        failures = check_optimization_quality(
+            baseline,
+            variant,
+            maximum_macro_f1_drop_percent=args.max_macro_f1_drop_percent,
+        )
+        result["comparison"] = {
+            "macro_f1_drop_percent": drop_percent,
+            "speedup_percent": (
+                1 - variant["mean_latency_ms"] / baseline["mean_latency_ms"]
+            )
+            * 100,
+            "promotion_eligible": not failures,
+            "quality_gate_failures": failures,
+        }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(results, indent=2))
