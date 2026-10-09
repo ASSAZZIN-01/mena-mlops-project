@@ -217,3 +217,22 @@ uv run python scripts/benchmark_optimization.py \
 
 The benchmark records mean latency, p95 latency, and measured speedup. The
 final project benchmark table will be added after the optimization run.
+### Optimization variants
+
+Keep the canonical PyTorch model unchanged and build deployment variants from
+the same model artifact:
+
+```bash
+uv run python scripts/build_model_variants.py \
+  --model-path models/arabert-debug \
+  --output-dir models/arabert-debug-variants
+uv run python scripts/evaluate_model_variants.py \
+  --model-path models/arabert-debug \
+  --variants-dir models/arabert-debug-variants
+```
+
+The builder writes ONNX FP32 and ONNX dynamic-INT8 files plus a manifest with
+the source model version and SHA-256 checksums. The evaluator compares accuracy,
+macro-F1, per-class F1, and CPU latency on the same test set. An optimized
+variant is only eligible for deployment after it passes the existing quality
+gate and an equivalent serving/load-test comparison.
