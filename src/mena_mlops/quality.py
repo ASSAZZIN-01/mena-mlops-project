@@ -32,3 +32,34 @@ def check_quality(
             f"{minimum_neutral_f1:.6f}"
         )
     return failures
+
+
+def check_optimization_quality(
+    baseline: dict[str, float],
+    variant: dict[str, float],
+    *,
+    maximum_macro_f1_drop_percent: float = 5.0,
+) -> list[str]:
+    """Gate an optimization variant against quality and latency baselines."""
+
+    baseline_macro_f1 = float(baseline["macro_f1"])
+    variant_macro_f1 = float(variant["macro_f1"])
+    baseline_latency = float(baseline["mean_latency_ms"])
+    variant_latency = float(variant["mean_latency_ms"])
+    if baseline_macro_f1 <= 0:
+        raise ValueError("baseline macro-F1 must be positive")
+    drop_percent = (
+        (baseline_macro_f1 - variant_macro_f1) / baseline_macro_f1 * 100
+    )
+    failures: list[str] = []
+    if drop_percent >= maximum_macro_f1_drop_percent:
+        failures.append(
+            f"macro-F1 drop {drop_percent:.2f}% is not below "
+            f"{maximum_macro_f1_drop_percent:.2f}%"
+        )
+    if variant_latency >= baseline_latency:
+        failures.append(
+            f"mean latency {variant_latency:.2f} ms is not below "
+            f"baseline {baseline_latency:.2f} ms"
+        )
+    return failures
