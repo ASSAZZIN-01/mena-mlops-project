@@ -207,6 +207,20 @@ uv run python scripts/promote_candidate.py \
 
 ## CPU optimization
 
+### Reviewer model bootstrap
+
+Model files are intentionally not committed to Git. Reviewers can download
+the public promoted INT8 bundle and verify its checksums before starting the
+deployment:
+
+```bash
+uv run python scripts/download_model_bundle.py
+docker compose up --build
+```
+
+The download contains only the promoted deployment representation and its
+tokenizer. Private DVC and MLflow artifacts remain in the private GCS bucket.
+
 Compare the original model with dynamic INT8 quantization:
 
 ```bash

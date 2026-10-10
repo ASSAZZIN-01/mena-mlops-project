@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
+from shutil import copy2
 from typing import Any
 
 import numpy as np
@@ -94,6 +95,10 @@ def export_onnx_model(
             | {"logits": {0: "batch"}},
             opset_version=17,
         )
+    for filename in ("tokenizer.json", "tokenizer_config.json"):
+        source = Path(tokenizer.name_or_path) / filename
+        if source.is_file():
+            copy2(source, output_path.parent / filename)
 
 
 def onnx_predict(
