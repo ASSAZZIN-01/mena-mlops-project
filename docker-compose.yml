@@ -10,7 +10,7 @@ services:
       MODEL_DEVICE: cpu
     volumes:
       - ${STABLE_MODEL_PATH:-./models/arabert-debug-variants}:/models/stable:ro
-      - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug}:/models/tokenizer:ro
+      - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug-variants}:/models/tokenizer:ro
     healthcheck:
       test:
         - CMD
