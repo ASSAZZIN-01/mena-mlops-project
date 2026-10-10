@@ -2,11 +2,15 @@ services:
   model-stable:
     build: .
     environment:
+      MODEL_BACKEND: ${STABLE_MODEL_BACKEND:-onnx}
       MODEL_PATH: /models/stable
+      MODEL_ONNX_PATH: /models/stable/model-int8.onnx
+      MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${STABLE_MODEL_VERSION:-stable-v1}
       MODEL_DEVICE: cpu
     volumes:
-      - ${STABLE_MODEL_PATH:-./models/arabert-debug}:/models/stable:ro
+      - ${STABLE_MODEL_PATH:-./models/arabert-debug-variants}:/models/stable:ro
+      - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug}:/models/tokenizer:ro
     healthcheck:
       test:
         - CMD
@@ -23,11 +27,15 @@ services:
   model-candidate:
     build: .
     environment:
+      MODEL_BACKEND: ${CANDIDATE_MODEL_BACKEND:-onnx}
       MODEL_PATH: /models/candidate
+      MODEL_ONNX_PATH: /models/candidate/model-int8.onnx
+      MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${CANDIDATE_MODEL_VERSION:-candidate-v1}
       MODEL_DEVICE: cpu
     volumes:
-      - ${CANDIDATE_MODEL_PATH:-./models/arabert-debug}:/models/candidate:ro
+      - ${CANDIDATE_MODEL_PATH:-./models/arabert-debug-variants}:/models/candidate:ro
+      - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug}:/models/tokenizer:ro
     healthcheck:
       test:
         - CMD
