@@ -218,6 +218,12 @@ uv run python scripts/download_model_bundle.py
 docker compose up --build
 ```
 
+Open the reviewer dashboard at
+[`http://localhost:8501`](http://localhost:8501). It provides live inference,
+CSV batch inference with progress and download, plus links to Grafana,
+Prometheus, MLflow, and Airflow. Load testing remains a controlled Locust
+command rather than a web-triggered operation.
+
 The download contains only the promoted deployment representation and its
 tokenizer. Private DVC and MLflow artifacts remain in the private GCS bucket.
 
