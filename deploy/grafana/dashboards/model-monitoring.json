@@ -57,7 +57,7 @@
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
       "targets": [
         {
-          "expr": "sum by (label) (rate(mena_model_predictions_total[5m]))",
+          "expr": "round(sum by (label) (increase(mena_model_predictions_total[$__range])))",
           "legendFormat": "{{label}}"
         }
       ],
