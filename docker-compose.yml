@@ -35,7 +35,7 @@ services:
       MODEL_DEVICE: cpu
     volumes:
       - ${CANDIDATE_MODEL_PATH:-./models/arabert-debug-variants}:/models/candidate:ro
-      - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug}:/models/tokenizer:ro
+      - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug-variants}:/models/tokenizer:ro
     healthcheck:
       test:
         - CMD
@@ -65,6 +65,26 @@ services:
       - ./deploy/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
       - ./deploy/nginx-entrypoint.sh:/docker-entrypoint-custom.sh:ro
     entrypoint: ["/bin/sh", "/docker-entrypoint-custom.sh"]
+
+  dashboard:
+    build: .
+    depends_on:
+      nginx:
+        condition: service_started
+    environment:
+      MODEL_API_URL: http://nginx:8080
+      GRAFANA_URL: ${GRAFANA_URL:-http://localhost:3000}
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://localhost:9090}
+      MLFLOW_URL: ${MLFLOW_URL:-http://localhost:5000}
+      AIRFLOW_URL: ${AIRFLOW_URL:-http://localhost:8081}
+    ports:
+      - "8501:8501"
+    command:
+      - streamlit
+      - run
+      - scripts/dashboard.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
 
   prometheus:
     image: prom/prometheus:v3.5.0

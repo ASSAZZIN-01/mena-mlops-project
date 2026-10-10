@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+COPY scripts ./scripts
 COPY bentofile.yaml ./
 
 RUN pip install --no-cache-dir uv \

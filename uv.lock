@@ -2989,6 +2989,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "redis" },
     { name = "scikit-learn" },
+    { name = "streamlit" },
     { name = "torch" },
     { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
@@ -3002,7 +3003,6 @@ dev = [
     { name = "onnx" },
     { name = "pytest" },
     { name = "ruff" },
-    { name = "streamlit" },
 ]
 
 [package.metadata]
@@ -3024,6 +3024,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "redis", specifier = ">=5.0" },
     { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "streamlit", specifier = ">=1.40" },
     { name = "torch", specifier = "==2.5.1", index = "https://download.pytorch.org/whl/cu121" },
     { name = "transformers", specifier = ">=4.45" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
@@ -3037,7 +3038,6 @@ dev = [
     { name = "onnx", specifier = ">=1.16" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "ruff", specifier = ">=0.6" },
-    { name = "streamlit", specifier = ">=1.40" },
 ]
 
 [[package]]
