@@ -239,3 +239,10 @@ variant is eligible when its mean latency improves and its macro-F1 drop stays
 strictly below the configured 5% optimization tolerance. The current benchmark
 therefore selects ONNX INT8 for deployment while retaining PyTorch as the
 canonical baseline.
+
+The Compose stable service now defaults to the promoted ONNX INT8 artifact.
+The PyTorch model remains available as the rollback/reference artifact, while
+the candidate service remains independently configurable for future model
+versions. See
+[`docs/optimization-benchmark.md`](docs/optimization-benchmark.md) for the
+offline and system-level benchmark results.
