@@ -6,7 +6,7 @@ services:
       MODEL_PATH: /models/stable
       MODEL_ONNX_PATH: /models/stable/model-int8.onnx
       MODEL_TOKENIZER_PATH: /models/tokenizer
-      MODEL_VERSION: ${STABLE_MODEL_VERSION:-stable-v1}
+      MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
       MODEL_DEVICE: cpu
     volumes:
       - ${STABLE_MODEL_PATH:-./models/arabert-debug-variants}:/models/stable:ro
