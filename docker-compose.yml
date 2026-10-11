@@ -86,6 +86,54 @@ services:
       - --server.address=0.0.0.0
       - --server.port=8501
 
+  feedback-ui:
+    build: .
+    depends_on:
+      feedback-consumer:
+        condition: service_started
+    environment:
+      FEEDBACK_DB: /data/feedback/reviewed.db
+    ports:
+      - "8502:8501"
+    volumes:
+      - ./data/feedback:/data/feedback
+    command:
+      - streamlit
+      - run
+      - scripts/feedback_ui.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+
+  feedback-consumer:
+    build: .
+    depends_on:
+      model-stable:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      MODEL_BACKEND: ${STABLE_MODEL_BACKEND:-onnx}
+      MODEL_PATH: /models/stable
+      MODEL_ONNX_PATH: /models/stable/model-int8.onnx
+      MODEL_TOKENIZER_PATH: /models/tokenizer
+      MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
+      MODEL_DEVICE: cpu
+      REDIS_URL: redis://redis:6379/0
+      FEEDBACK_DB: /data/feedback/reviewed.db
+      FEEDBACK_MIN_CONFIDENCE: ${FEEDBACK_MIN_CONFIDENCE:-0.25}
+      FEEDBACK_MAX_CONFIDENCE: ${FEEDBACK_MAX_CONFIDENCE:-0.75}
+    volumes:
+      - ${STABLE_MODEL_PATH:-./models/arabert-debug-variants}:/models/stable:ro
+      - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug-variants}:/models/tokenizer:ro
+      - ./data/feedback:/data/feedback
+    command:
+      - uv
+      - run
+      - --no-sync
+      - python
+      - scripts/run_stream_consumer.py
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v3.5.0
     depends_on:

@@ -17,6 +17,8 @@ data/processed/*
 !data/processed/.gitkeep
 data/interim/*
 !data/interim/.gitkeep
+data/feedback/*
+!data/feedback/.gitkeep
 reports/*
 !reports/.gitkeep
 models/*

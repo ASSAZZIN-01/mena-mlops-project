@@ -16,6 +16,7 @@ API_URL = os.getenv("MODEL_API_URL", "http://localhost:8080").rstrip("/")
 LINKS = {
     "Grafana": os.getenv("GRAFANA_URL", "http://localhost:3000"),
     "Prometheus": os.getenv("PROMETHEUS_URL", "http://localhost:9090"),
+    "Feedback review": os.getenv("FEEDBACK_URL", "http://localhost:8502"),
 }
 OPTIONAL_LINKS = {
     "MLflow": os.getenv("MLFLOW_URL", ""),

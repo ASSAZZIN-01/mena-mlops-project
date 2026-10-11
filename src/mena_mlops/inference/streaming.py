@@ -157,7 +157,10 @@ def create_consumer() -> RedisInferenceConsumer:
         Path(os.getenv("FEEDBACK_DB", "data/feedback/reviewed.db"))
     )
     return RedisInferenceConsumer(
-        Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0")),
+        Redis.from_url(
+            os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            decode_responses=True,
+        ),
         _load_predictor(),
         input_stream=os.getenv("REDIS_INPUT_STREAM", "reviews:input"),
         output_stream=os.getenv("REDIS_OUTPUT_STREAM", "reviews:predictions"),
