@@ -24,10 +24,18 @@ OPTIONAL_LINKS = {
 }
 
 
-def predict(text: str) -> dict[str, object]:
+def predict(
+    text: str,
+    *,
+    source: str = "live",
+    input_id: str | None = None,
+) -> dict[str, object]:
+    payload = {"text": text, "source": source}
+    if input_id is not None:
+        payload["input_id"] = input_id
     request = Request(
         f"{API_URL}/predict",
-        data=json.dumps({"text": text}, ensure_ascii=False).encode(),
+        data=json.dumps(payload, ensure_ascii=False).encode(),
         headers={"Content-Type": "application/json"},
         method="POST",
     )
@@ -83,7 +91,11 @@ def batch_predict(frame: pd.DataFrame) -> pd.DataFrame:
     progress = st.progress(0, text="Starting batch inference")
     total = len(frame)
     for index, record in enumerate(frame.to_dict(orient="records"), start=1):
-        result = predict(str(record["text"]))
+        result = predict(
+            str(record["text"]),
+            source="batch",
+            input_id=str(record["ID"]),
+        )
         rows.append(
             {
                 **record,

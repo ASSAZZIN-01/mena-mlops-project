@@ -236,6 +236,10 @@ Events published to `reviews:input` are scored with the promoted INT8 model;
 predictions whose confidence is between 25% and 75% are persisted in the
 feedback database for human review at port 8502.
 
+All live, batch, and stream predictions are also persisted in the audit
+database at `data/audit/predictions.db`, including their source, input ID,
+model version, probabilities, confidence, and review status.
+
 The download contains only the promoted deployment representation and its
 tokenizer. Private DVC and MLflow artifacts remain in the private GCS bucket.
 
