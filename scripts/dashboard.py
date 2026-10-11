@@ -16,8 +16,10 @@ API_URL = os.getenv("MODEL_API_URL", "http://localhost:8080").rstrip("/")
 LINKS = {
     "Grafana": os.getenv("GRAFANA_URL", "http://localhost:3000"),
     "Prometheus": os.getenv("PROMETHEUS_URL", "http://localhost:9090"),
-    "MLflow": os.getenv("MLFLOW_URL", "http://localhost:5000"),
-    "Airflow": os.getenv("AIRFLOW_URL", "http://localhost:8081"),
+}
+OPTIONAL_LINKS = {
+    "MLflow": os.getenv("MLFLOW_URL", ""),
+    "Airflow": os.getenv("AIRFLOW_URL", ""),
 }
 
 
@@ -161,6 +163,11 @@ def main() -> None:
         st.subheader("Operational tools")
         for label, url in LINKS.items():
             st.link_button(f"Open {label}", url, use_container_width=True)
+        for label, url in OPTIONAL_LINKS.items():
+            if url:
+                st.link_button(f"Open {label}", url, use_container_width=True)
+            else:
+                st.caption(f"{label}: not included in the local Compose stack")
         st.caption(f"Gateway: `{API_URL}`")
 
     live_tab, batch_tab = st.tabs(["Live inference", "Batch inference"])

@@ -226,6 +226,10 @@ generated when absent, and `source` defaults to empty when absent. Load
 testing remains a controlled Locust command rather than a web-triggered
 operation.
 
+Grafana and Prometheus are included in the local Compose stack. MLflow and
+Airflow links appear only when `MLFLOW_URL` and `AIRFLOW_URL` are configured
+for externally running services.
+
 The download contains only the promoted deployment representation and its
 tokenizer. Private DVC and MLflow artifacts remain in the private GCS bucket.
 

@@ -75,8 +75,8 @@ services:
       MODEL_API_URL: http://nginx:8080
       GRAFANA_URL: ${GRAFANA_URL:-http://localhost:3000}
       PROMETHEUS_URL: ${PROMETHEUS_URL:-http://localhost:9090}
-      MLFLOW_URL: ${MLFLOW_URL:-http://localhost:5000}
-      AIRFLOW_URL: ${AIRFLOW_URL:-http://localhost:8081}
+      MLFLOW_URL: ${MLFLOW_URL:-}
+      AIRFLOW_URL: ${AIRFLOW_URL:-}
     ports:
       - "8501:8501"
     command:
