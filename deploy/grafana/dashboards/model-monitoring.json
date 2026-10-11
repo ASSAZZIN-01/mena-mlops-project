@@ -1,37 +1,119 @@
 {
   "title": "MENA Model Monitoring",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "panels": [
+    {
+      "title": "Total prediction requests",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(bentoml_service_request_total{endpoint=\"/predict\"})",
+          "legendFormat": "requests"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    },
+    {
+      "title": "Average response time",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\"}[5m]))",
+          "legendFormat": "average"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 4}}
+    },
+    {
+      "title": "p95 response time",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict\",http_response_code=\"200\"}[5m])))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 4}}
+    },
+    {
+      "title": "Error rate",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum(rate(bentoml_service_request_total{endpoint=\"/predict\"}[5m]))",
+          "legendFormat": "errors"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 2}}
+    },
+    {
+      "title": "Prediction distribution by argmax label",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "targets": [
+        {
+          "expr": "round(sum by (label) (increase(mena_model_predictions_total[$__range])))",
+          "legendFormat": "{{label}}"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "table", "placement": "right", "values": ["percent", "value"]},
+        "pieType": "donut",
+        "tooltip": {"mode": "multi"}
+      }
+    },
     {
       "title": "Prediction requests by deployment",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
       "targets": [
         {
-          "expr": "sum by (deployment) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\"}[5m]))",
+          "expr": "sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
           "legendFormat": "{{deployment}}"
         }
-      ]
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
     },
     {
-      "title": "Request latency p95",
+      "title": "Average confidence by predicted class",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, deployment) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict\"}[5m])))",
-          "legendFormat": "{{deployment}}"
+          "expr": "sum by (label) (rate(mena_model_prediction_confidence_sum[5m])) / sum by (label) (rate(mena_model_prediction_confidence_count[5m]))",
+          "legendFormat": "{{label}} predicted"
         }
-      ]
+      ],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
     },
     {
-      "title": "HTTP 5xx error rate",
+      "title": "Min and max confidence by predicted class",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
       "targets": [
         {
-          "expr": "sum by (deployment) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum by (deployment) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\"}[5m]))",
+          "expr": "mena_model_prediction_confidence_min",
+          "legendFormat": "{{label}} min"
+        },
+        {
+          "expr": "mena_model_prediction_confidence_max",
+          "legendFormat": "{{label}} max"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
+    },
+    {
+      "title": "HTTP 5xx error rate by deployment",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 21},
+      "targets": [
+        {
+          "expr": "sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\"}[5m]))",
           "legendFormat": "{{deployment}}"
         }
       ],
@@ -40,7 +122,7 @@
     {
       "title": "Service availability",
       "type": "stat",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 21},
       "targets": [
         {
           "expr": "min by (deployment) (up{job=~\"model-stable|model-candidate\"})",
@@ -52,7 +134,7 @@
     {
       "title": "Maximum feature PSI",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 29},
       "targets": [
         {
           "expr": "mena_drift_psi_max",

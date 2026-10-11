@@ -221,8 +221,20 @@ docker compose up --build
 Open the reviewer dashboard at
 [`http://localhost:8501`](http://localhost:8501). It provides live inference,
 CSV batch inference with progress and download, plus links to Grafana,
-Prometheus, MLflow, and Airflow. Load testing remains a controlled Locust
-command rather than a web-triggered operation.
+Prometheus, and the automatic feedback review UI at
+[`http://localhost:8502`](http://localhost:8502). Batch CSV files require `text`; `ID` is
+generated when absent, and `source` defaults to empty when absent. Load
+testing remains a controlled Locust command rather than a web-triggered
+operation.
+
+Grafana and Prometheus are included in the local Compose stack. MLflow and
+Airflow links appear only when `MLFLOW_URL` and `AIRFLOW_URL` are configured
+for externally running services.
+
+The Compose stack also launches the Redis inference consumer automatically.
+Events published to `reviews:input` are scored with the promoted INT8 model;
+predictions whose confidence is between 25% and 75% are persisted in the
+feedback database for human review at port 8502.
 
 The download contains only the promoted deployment representation and its
 tokenizer. Private DVC and MLflow artifacts remain in the private GCS bucket.

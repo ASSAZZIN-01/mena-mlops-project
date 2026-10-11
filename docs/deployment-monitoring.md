@@ -80,12 +80,8 @@ Each output record contains `prediction`, JSON-encoded `probabilities`,
 The Compose stack includes Redis on port `6379`. The streaming consumer reads
 review events from `reviews:input`, publishes predictions to
 `reviews:predictions`, and acknowledges an input only after the prediction has
-been written successfully:
-
-```bash
-REDIS_URL=redis://localhost:6379/0 \
-uv run python scripts/run_stream_consumer.py
-```
+been written successfully. It is launched automatically by `docker compose up`
+and persists low-confidence predictions in `data/feedback/reviewed.db`.
 
 Publish an input event from another terminal:
 
