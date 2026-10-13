@@ -105,11 +105,14 @@ test, and per-source evaluation in one MLflow run:
 uv run python -m mena_mlops.training.train
 ```
 
-MLflow uses local SQLite metadata configured in `configs/training.yaml`, while
-run artifacts are stored in
+The Compose MLflow server is the shared tracking endpoint at
+`http://localhost:5000`. It stores run metadata in its persistent SQLite
+volume and proxies model artifacts to
 `gs://mena-mlops-project-dvc/mlflow`. Set
-`GOOGLE_APPLICATION_CREDENTIALS` before training. The SQLite database and
-generated local artifacts are ignored by Git.
+`GOOGLE_APPLICATION_CREDENTIALS` to a local service-account JSON file before
+starting Compose or training. The tracking URI and artifact location can be
+overridden with `MLFLOW_TRACKING_URI` and `MLFLOW_ARTIFACT_LOCATION`, so the
+same training command works locally, in CI, and in deployment environments.
 
 ## Deployment and inference
 
