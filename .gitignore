@@ -19,6 +19,8 @@ data/interim/*
 !data/interim/.gitkeep
 data/feedback/*
 !data/feedback/.gitkeep
+data/audit/*
+!data/audit/.gitkeep
 reports/*
 !reports/.gitkeep
 models/*

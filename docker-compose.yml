@@ -8,9 +8,13 @@ services:
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
       MODEL_DEVICE: cpu
+      AUDIT_DB: /data/audit/predictions.db
+      FEEDBACK_DB: /data/feedback/reviewed.db
     volumes:
       - ${STABLE_MODEL_PATH:-./models/arabert-debug-variants}:/models/stable:ro
       - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug-variants}:/models/tokenizer:ro
+      - ./data/audit:/data/audit
+      - ./data/feedback:/data/feedback
     healthcheck:
       test:
         - CMD
@@ -33,9 +37,13 @@ services:
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${CANDIDATE_MODEL_VERSION:-candidate-v1}
       MODEL_DEVICE: cpu
+      AUDIT_DB: /data/audit/predictions.db
+      FEEDBACK_DB: /data/feedback/reviewed.db
     volumes:
       - ${CANDIDATE_MODEL_PATH:-./models/arabert-debug-variants}:/models/candidate:ro
       - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug-variants}:/models/tokenizer:ro
+      - ./data/audit:/data/audit
+      - ./data/feedback:/data/feedback
     healthcheck:
       test:
         - CMD
@@ -119,6 +127,7 @@ services:
       MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
       MODEL_DEVICE: cpu
       REDIS_URL: redis://redis:6379/0
+      AUDIT_DB: /data/audit/predictions.db
       FEEDBACK_DB: /data/feedback/reviewed.db
       FEEDBACK_MIN_CONFIDENCE: ${FEEDBACK_MIN_CONFIDENCE:-0.25}
       FEEDBACK_MAX_CONFIDENCE: ${FEEDBACK_MAX_CONFIDENCE:-0.75}
@@ -126,6 +135,7 @@ services:
       - ${STABLE_MODEL_PATH:-./models/arabert-debug-variants}:/models/stable:ro
       - ${MODEL_TOKENIZER_PATH:-./models/arabert-debug-variants}:/models/tokenizer:ro
       - ./data/feedback:/data/feedback
+      - ./data/audit:/data/audit
     command:
       - uv
       - run

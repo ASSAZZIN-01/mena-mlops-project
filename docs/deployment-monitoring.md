@@ -83,6 +83,11 @@ review events from `reviews:input`, publishes predictions to
 been written successfully. It is launched automatically by `docker compose up`
 and persists low-confidence predictions in `data/feedback/reviewed.db`.
 
+The serving services persist every live and batch prediction in
+`data/audit/predictions.db`. Each audit record includes the source, optional
+input ID, text, prediction, confidence, probabilities, model version, and
+whether human review is required.
+
 Publish an input event from another terminal:
 
 ```bash

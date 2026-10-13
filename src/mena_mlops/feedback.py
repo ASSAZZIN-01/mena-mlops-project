@@ -20,6 +20,7 @@ class FeedbackItem:
     confidence: float
     reviewed_label: str | None
     reviewed_at: str | None
+    review_status: str
 
 
 class FeedbackStore:
@@ -40,10 +41,22 @@ class FeedbackStore:
                         reviewed_label IS NULL OR reviewed_label IN
                         ('negative', 'neutral', 'positive')
                     ),
-                    reviewed_at TEXT
+                    reviewed_at TEXT,
+                    review_status TEXT NOT NULL DEFAULT 'pending'
                 )
                 """
             )
+            columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(feedback)")
+            }
+            if "review_status" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE feedback
+                    ADD COLUMN review_status TEXT NOT NULL DEFAULT 'pending'
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -81,9 +94,9 @@ class FeedbackStore:
             row = connection.execute(
                 """
                 SELECT id, text, predicted_label, confidence,
-                       reviewed_label, reviewed_at
+                       reviewed_label, reviewed_at, review_status
                 FROM feedback
-                WHERE reviewed_label IS NULL
+                WHERE reviewed_label IS NULL AND review_status = 'pending'
                 ORDER BY id
                 LIMIT 1
                 """
@@ -106,10 +119,23 @@ class FeedbackStore:
             connection.execute(
                 """
                 UPDATE feedback
-                SET reviewed_label = ?, reviewed_at = ?
+                SET reviewed_label = ?, reviewed_at = ?, review_status = 'validated'
                 WHERE id = ? AND reviewed_label IS NULL
                 """,
                 (reviewed_label, datetime.now(UTC).isoformat(), item_id),
+            )
+
+    def defer(self, item_id: int) -> None:
+        """Defer an uncertain item without adding it to validated data."""
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE feedback
+                SET reviewed_at = ?, review_status = 'deferred'
+                WHERE id = ? AND reviewed_label IS NULL
+                """,
+                (datetime.now(UTC).isoformat(), item_id),
             )
 
     def counts(self) -> dict[str, int]:
@@ -168,7 +194,7 @@ class FeedbackStore:
             row = connection.execute(
                 """
                 SELECT id, text, predicted_label, confidence,
-                       reviewed_label, reviewed_at
+                       reviewed_label, reviewed_at, review_status
                 FROM feedback WHERE id = ?
                 """,
                 (item_id,),

@@ -12,6 +12,7 @@ from typing import Protocol
 from redis import Redis
 from redis.exceptions import ResponseError
 
+from mena_mlops.audit import PredictionAuditStore
 from mena_mlops.feedback import FeedbackStore
 
 LOGGER = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ class RedisInferenceConsumer:
         group: str = "mena-inference",
         consumer: str = "worker-1",
         feedback_store: FeedbackStore | None = None,
+        audit_store: PredictionAuditStore | None = None,
         feedback_min_confidence: float = 0.25,
         feedback_max_confidence: float = 0.75,
     ) -> None:
@@ -87,6 +89,7 @@ class RedisInferenceConsumer:
         self.group = group
         self.consumer = consumer
         self.feedback_store = feedback_store
+        self.audit_store = audit_store
         self.feedback_min_confidence = feedback_min_confidence
         self.feedback_max_confidence = feedback_max_confidence
 
@@ -125,6 +128,15 @@ class RedisInferenceConsumer:
                         self.predictor,
                     )
                     self.client.xadd(self.output_stream, prediction)
+                    if self.audit_store is not None:
+                        self.audit_store.record(
+                            text=review.text,
+                            prediction=prediction["prediction"],
+                            probabilities=json.loads(prediction["probabilities"]),
+                            model_version=prediction["model_version"],
+                            source="stream",
+                            input_id=review.event_id,
+                        )
                     if self.feedback_store is not None:
                         probabilities = json.loads(prediction["probabilities"])
                         confidence = max(probabilities.values())
@@ -156,6 +168,9 @@ def create_consumer() -> RedisInferenceConsumer:
     feedback_store = FeedbackStore(
         Path(os.getenv("FEEDBACK_DB", "data/feedback/reviewed.db"))
     )
+    audit_store = PredictionAuditStore(
+        Path(os.getenv("AUDIT_DB", "data/audit/predictions.db"))
+    )
     return RedisInferenceConsumer(
         Redis.from_url(
             os.getenv("REDIS_URL", "redis://localhost:6379/0"),
@@ -167,6 +182,7 @@ def create_consumer() -> RedisInferenceConsumer:
         group=os.getenv("REDIS_CONSUMER_GROUP", "mena-inference"),
         consumer=os.getenv("REDIS_CONSUMER_NAME", "worker-1"),
         feedback_store=feedback_store,
+        audit_store=audit_store,
         feedback_min_confidence=float(
             os.getenv("FEEDBACK_MIN_CONFIDENCE", "0.25")
         ),

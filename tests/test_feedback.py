@@ -23,3 +23,13 @@ def test_incorrect_review_requires_corrected_label(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="corrected label"):
         store.review(item_id, correct=False)
+
+
+def test_deferred_feedback_is_not_validated_or_pending(tmp_path: Path) -> None:
+    store = FeedbackStore(tmp_path / "feedback.db")
+    item_id = store.add_uncertain("نص غامض", "neutral", 0.5)
+
+    store.defer(item_id)
+
+    assert store.next_pending() is None
+    assert store.counts() == {"negative": 0, "neutral": 0, "positive": 0}

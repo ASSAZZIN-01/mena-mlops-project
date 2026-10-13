@@ -48,8 +48,13 @@ def main() -> None:
 
     decision = st.radio(
         "Is the prediction correct?",
-        options=("Correct", "Wrong"),
+        options=("Correct", "Wrong", "I don't know"),
         horizontal=True,
+        help=(
+            "Choose this when the text is ambiguous or you cannot confidently "
+            "validate the label. It will be deferred and excluded from "
+            "retraining counts."
+        ),
         key=f"decision-{item.id}",
     )
     corrected_label = None
@@ -61,12 +66,16 @@ def main() -> None:
             key=f"label-{item.id}",
         )
 
-    if st.button("Save review", type="primary", key=f"save-{item.id}"):
-        store.review(
-            item.id,
-            correct=decision == "Correct",
-            corrected_label=corrected_label,
-        )
+    button_label = "Defer review" if decision == "I don't know" else "Save review"
+    if st.button(button_label, type="primary", key=f"save-{item.id}"):
+        if decision == "I don't know":
+            store.defer(item.id)
+        else:
+            store.review(
+                item.id,
+                correct=decision == "Correct",
+                corrected_label=corrected_label,
+            )
         st.rerun()
 
 

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from threading import Lock
 
 import bentoml
 from prometheus_client import Counter, Gauge, Histogram
 
+from mena_mlops.audit import PredictionAuditStore
+from mena_mlops.feedback import FeedbackStore
 from mena_mlops.serving.app import (
     HealthResponse,
     PredictionRequest,
@@ -70,12 +74,34 @@ class SentimentService:
 
     def __init__(self) -> None:
         self.predictor = _load_predictor()
+        self.audit_store = PredictionAuditStore(
+            Path(os.getenv("AUDIT_DB", "data/audit/predictions.db"))
+        )
+        self.feedback_store = FeedbackStore(
+            Path(os.getenv("FEEDBACK_DB", "data/feedback/reviewed.db"))
+        )
 
     @bentoml.api
-    def predict(self, text: str) -> PredictionResponse:
+    def predict(
+        self,
+        text: str,
+        source: str = "live",
+        input_id: str | None = None,
+    ) -> PredictionResponse:
         payload = PredictionRequest(text=text)
         label, probabilities = self.predictor.predict(payload.text)
         record_prediction_metrics(label, probabilities, self.predictor.model_version)
+        confidence = probabilities[label]
+        self.audit_store.record(
+            text=text,
+            prediction=label,
+            probabilities=probabilities,
+            model_version=self.predictor.model_version,
+            source=source,
+            input_id=input_id,
+        )
+        if 0.25 <= confidence <= 0.75:
+            self.feedback_store.add_uncertain(text, label, confidence)
         return PredictionResponse(
             label=label,
             probabilities=probabilities,
