@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import random
 from pathlib import Path
 from typing import Any
@@ -211,9 +212,16 @@ def run_training(config_path: Path) -> str:
         lr=float(train_config["learning_rate"]),
         weight_decay=float(train_config["weight_decay"]),
     )
-    mlflow.set_tracking_uri(str(config["mlflow"]["tracking_uri"]))
+    tracking_uri = os.getenv(
+        "MLFLOW_TRACKING_URI",
+        str(config["mlflow"]["tracking_uri"]),
+    )
+    mlflow.set_tracking_uri(tracking_uri)
     experiment_name = str(config["mlflow"]["experiment_name"])
-    artifact_location = config["mlflow"].get("artifact_location")
+    artifact_location = os.getenv(
+        "MLFLOW_ARTIFACT_LOCATION",
+        config["mlflow"].get("artifact_location"),
+    )
     if artifact_location and mlflow.get_experiment_by_name(experiment_name) is None:
         mlflow.create_experiment(
             experiment_name,
