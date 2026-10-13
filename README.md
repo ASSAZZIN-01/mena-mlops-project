@@ -227,10 +227,11 @@ generated when absent, and `source` defaults to empty when absent. Load
 testing remains a controlled Locust command rather than a web-triggered
 operation.
 
-Grafana, Prometheus, and MLflow are included in the local Compose stack.
+Grafana, Prometheus, MLflow, and Airflow are included in the local Compose stack.
 MLflow uses persistent Compose volumes for its SQLite backend and artifacts.
-Airflow appears only when `AIRFLOW_URL` is configured for an externally
-running service.
+Airflow uses a persistent Compose home volume and is available at
+[`http://localhost:8081`](http://localhost:8081), with the default credentials
+from `.env.example` unless overridden.
 
 The Compose stack also launches the Redis inference consumer automatically.
 Events published to `reviews:input` are scored with the promoted INT8 model;
