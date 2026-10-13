@@ -21,6 +21,7 @@ from mena_mlops.training.data import (
     build_label_maps,
     encode_labels,
     load_split,
+    oversample_training_frame,
     split_summary,
 )
 from mena_mlops.training.evaluation import evaluate_by_source, evaluate_predictions
@@ -166,6 +167,12 @@ def run_training(config_path: Path) -> str:
     frames = {
         split: load_split(data_dir, split) for split in ["train", "validation", "test"]
     }
+    oversampling = config["training"].get("oversampling", {})
+    if bool(oversampling.get("enabled", False)):
+        frames["train"] = oversample_training_frame(
+            frames["train"],
+            seed=int(config["seed"]),
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -231,6 +238,7 @@ def run_training(config_path: Path) -> str:
                 "device": str(device),
                 "cuda_available": torch.cuda.is_available(),
                 "data_mode": data_config["split"]["debug"],
+                "oversampling_enabled": bool(oversampling.get("enabled", False)),
             }
         )
         mlflow.log_dict(config, "training_config.json")

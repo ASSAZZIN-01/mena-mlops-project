@@ -43,3 +43,27 @@ def split_summary(frame: pd.DataFrame) -> dict[str, Any]:
         "labels": frame["label"].value_counts().to_dict(),
         "sources": frame["source"].value_counts().to_dict(),
     }
+
+
+def oversample_training_frame(
+    frame: pd.DataFrame,
+    *,
+    seed: int,
+) -> pd.DataFrame:
+    """Randomly oversample minority labels without touching evaluation splits."""
+
+    counts = frame["label"].value_counts()
+    target_count = int(counts.max())
+    parts = [
+        group.sample(
+            n=target_count,
+            replace=len(group) < target_count,
+            random_state=seed,
+        )
+        for _, group in frame.groupby("label", sort=True)
+    ]
+    return (
+        pd.concat(parts, ignore_index=True)
+        .sample(frac=1.0, random_state=seed)
+        .reset_index(drop=True)
+    )
