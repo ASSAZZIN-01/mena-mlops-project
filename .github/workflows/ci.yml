@@ -152,7 +152,7 @@ jobs:
           curl --silent --show-error --output /tmp/prediction.json \
             -X POST http://localhost:8080/predict \
             -H 'Content-Type: application/json' \
-            -d '{"text":"المنتج ممتاز","source":"smoke","input_id":"ci-smoke"}'
+            -d '{"text":"المنتج ممتاز","source":"live","input_id":"ci-smoke"}'
           cat /tmp/prediction.json
           if ! grep -q '"label"' /tmp/prediction.json; then
             docker compose logs --tail=100
