@@ -1,7 +1,11 @@
 import pandas as pd
 import pytest
 
-from mena_mlops.training.data import build_label_maps, encode_labels
+from mena_mlops.training.data import (
+    build_label_maps,
+    encode_labels,
+    oversample_training_frame,
+)
 from mena_mlops.training.evaluation import evaluate_by_source, evaluate_predictions
 
 
@@ -23,6 +27,26 @@ def test_unknown_label_fails_before_training() -> None:
             pd.DataFrame({"label": ["unknown"]}),
             {"negative": 0, "positive": 1},
         )
+
+
+def test_oversampling_balances_training_labels_only() -> None:
+    frame = pd.DataFrame(
+        {
+            "id": ["a", "b", "c", "d", "e"],
+            "text": ["a", "b", "c", "d", "e"],
+            "label": ["negative", "negative", "neutral", "positive", "positive"],
+            "source": ["test"] * 5,
+        }
+    )
+
+    balanced = oversample_training_frame(frame, seed=42)
+
+    assert balanced["label"].value_counts().to_dict() == {
+        "negative": 2,
+        "neutral": 2,
+        "positive": 2,
+    }
+    assert len(balanced) == 6
 
 
 def test_evaluation_reports_per_class_and_source_metrics() -> None:
