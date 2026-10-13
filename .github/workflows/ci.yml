@@ -115,10 +115,50 @@ jobs:
           uv run python scripts/check_model_quality.py \
             --metrics tests/fixtures/quality_metrics.json
 
+  compose-smoke:
+    name: Integration • Docker Compose smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download public INT8 model bundle
+        run: python scripts/download_model_bundle.py
+      - name: Start Compose stack
+        run: docker compose up --build -d
+      - name: Wait for service health
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent http://localhost:8080/health >/dev/null &&
+               curl --fail --silent http://localhost:8501/ >/dev/null &&
+               curl --fail --silent http://localhost:8502/ >/dev/null &&
+               curl --fail --silent http://localhost:3000/api/health >/dev/null &&
+               curl --fail --silent http://localhost:5000/health >/dev/null &&
+               curl --fail --silent http://localhost:8081/health >/dev/null &&
+               curl --fail --silent http://localhost:9090/-/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          docker compose ps
+          docker compose logs --tail=100
+          exit 1
+      - name: Exercise gateway prediction
+        run: |
+          curl --fail --silent \
+            -X POST http://localhost:8080/predict \
+            -H 'Content-Type: application/json' \
+            -d '{"text":"المنتج ممتاز","source":"smoke","input_id":"ci-smoke"}' \
+            | tee /tmp/prediction.json
+          grep -q '"label"' /tmp/prediction.json
+      - name: Stop Compose stack
+        if: always()
+        run: docker compose down -v
+
   checks:
     name: checks
     if: ${{ always() }}
-    needs: [data, lint, tests, model-quality]
+    needs: [data, lint, tests, model-quality, compose-smoke]
     runs-on: ubuntu-latest
     steps:
       - name: Report required job results
@@ -126,7 +166,8 @@ jobs:
           if [[ "${{ needs.data.result }}" != "success" ||
                 "${{ needs.lint.result }}" != "success" ||
                 "${{ needs.tests.result }}" != "success" ||
-                "${{ needs.model-quality.result }}" != "success" ]]; then
+                "${{ needs.model-quality.result }}" != "success" ||
+                "${{ needs.compose-smoke.result }}" != "success" ]]; then
             echo "One or more required CI jobs failed."
             exit 1
           fi
