@@ -149,12 +149,15 @@ jobs:
           exit 1
       - name: Exercise gateway prediction
         run: |
-          curl --fail --silent \
+          curl --silent --show-error --output /tmp/prediction.json \
             -X POST http://localhost:8080/predict \
             -H 'Content-Type: application/json' \
-            -d '{"text":"المنتج ممتاز","source":"smoke","input_id":"ci-smoke"}' \
-            | tee /tmp/prediction.json
-          grep -q '"label"' /tmp/prediction.json
+            -d '{"text":"المنتج ممتاز","source":"smoke","input_id":"ci-smoke"}'
+          cat /tmp/prediction.json
+          if ! grep -q '"label"' /tmp/prediction.json; then
+            docker compose logs --tail=100
+            exit 1
+          fi
       - name: Stop Compose stack
         if: always()
         run: docker compose down -v
