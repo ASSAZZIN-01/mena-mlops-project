@@ -172,6 +172,13 @@ DAG accepts these environment variables:
 - `MENA_DRIFT_CURRENT`
 - `MENA_DRIFT_OUTPUT`
 - `MENA_DRIFT_SCHEDULE` (default: every 10 minutes for local verification)
+- `VERTEX_PROJECT_ID`
+- `VERTEX_REGION` (default: `us-central1`)
+- `VERTEX_MACHINE_TYPE` (default: `n1-standard-4`)
+- `VERTEX_ACCELERATOR_TYPE` (default: `NVIDIA_TESLA_T4`)
+- `VERTEX_TRAINING_IMAGE_URI`
+- `VERTEX_STAGING_BUCKET`
+- `MLFLOW_TRACKING_URI` (must be reachable from Vertex AI)
 
 ## Human feedback and retraining thresholds
 
@@ -187,6 +194,8 @@ thresholds are configured in `configs/feedback.yaml`:
 Incorrect reviews require the reviewer to select the corrected class. The
 reviewed records remain separate from validation and test data and can be
 merged into the training split only after all configured thresholds are met.
+For the local demonstration, `configs/feedback.yaml` uses temporary `5/1/5`
+thresholds; restore the production `100/20/100` values afterward.
 
 Run the reviewer interface locally with:
 
@@ -205,11 +214,26 @@ Check whether enough reviewed data exists to start retraining:
 uv run python scripts/check_retraining_gate.py
 ```
 
+In the Compose deployment, Airflow runs the drift report first and then calls
+`scripts/submit_vertex_retraining.py`. The submitter checks the same gate and
+skips safely when it is not ready. When the thresholds are met, it stages the
+processed splits and reviewed feedback in `VERTEX_STAGING_BUCKET`, submits a
+temporary Vertex AI Custom Job, and waits for its terminal state. The job uses
+the configured GPU worker, downloads the staged data, runs
+`scripts/vertex_train.py`, and terminates after training. The training
+container logs the run through the cloud-reachable `MLFLOW_TRACKING_URI` and
+configured GCS artifact location.
+
+The local MLflow URL (`http://localhost:5000`) cannot be used directly by a
+Vertex worker. To follow the same cloud MLflow server locally, expose it
+through an SSH tunnel or another secure port-forward to local port 5000.
+
 Candidate promotion must also pass the verified-label quality gate in
 `configs/promotion.yaml`. It requires a minimum macro-F1, improvement over
 the stable model, and minimum F1 floors for each sentiment class.
 
-When the feedback thresholds are reached, launch candidate retraining:
+When the feedback thresholds are reached, launch candidate retraining manually
+outside Airflow:
 
 ```bash
 uv run python scripts/run_retraining.py \

@@ -46,10 +46,19 @@ def evidently_drift() -> None:
             shlex.quote(output_dir),
         ]
     )
-    BashOperator(
+    drift_report = BashOperator(
         task_id="run_evidently_report",
         bash_command=run_report,
     )
+    retrain = BashOperator(
+        task_id="run_vertex_retraining",
+        bash_command=(
+            "cd "
+            + shlex.quote(project_root)
+            + " && python scripts/submit_vertex_retraining.py"
+        ),
+    )
+    drift_report >> retrain
 
 
 evidently_drift()
