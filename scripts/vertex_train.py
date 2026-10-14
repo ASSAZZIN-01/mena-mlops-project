@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
+import torch
 import yaml
 from google.cloud import storage
 
@@ -48,6 +49,20 @@ def main() -> None:
         config["paths"]["data_dir"] = str(data_dir)
         config["paths"]["output_dir"] = str(root / "model")
         config["paths"]["report_dir"] = str(root / "reports")
+        config["training"] = dict(config["training"])
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "Vertex GPU is unavailable in the training container: "
+                f"torch={torch.__version__}, cuda_build={torch.version.cuda}, "
+                f"device_count={torch.cuda.device_count()}"
+            )
+        print(
+            "Vertex GPU: "
+            f"{torch.cuda.get_device_name(0)} "
+            f"(torch={torch.__version__}, cuda_build={torch.version.cuda})",
+            flush=True,
+        )
+        config["training"]["device"] = "cuda"
         config_path = root / "training.yaml"
         config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
         run_id = run_training(config_path)
