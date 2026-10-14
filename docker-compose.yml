@@ -125,19 +125,25 @@ services:
       retries: 12
 
   airflow:
-    image: apache/airflow:2.10.4-python3.12
+    build:
+      context: .
+      dockerfile: deploy/airflow/Dockerfile
     ports:
       - "8081:8080"
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      MENA_DRIFT_SCHEDULE: "${MENA_DRIFT_SCHEDULE:-*/10 * * * *}"
       _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USERNAME:-admin}
       _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
     volumes:
       - airflow-home:/opt/airflow
       - ./dags:/opt/airflow/dags:ro
+      - ./src:/opt/mena-mlops-project/src:ro
+      - ./scripts:/opt/mena-mlops-project/scripts:ro
       - ./reports:/opt/mena-mlops-project/reports
       - ./data:/opt/mena-mlops-project/data
+    entrypoint: ["/usr/local/bin/mena-airflow-entrypoint"]
     command: standalone
     healthcheck:
       test:

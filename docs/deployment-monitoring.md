@@ -161,14 +161,17 @@ inspection, and `drift_summary.json` for automation. Current drift coverage
 includes input and prediction drift; verified labels will be added as a
 separate quality evaluation gate because they arrive later than predictions.
 
-For Airflow, mount the project into the scheduler/worker environment and copy
-the DAG from `dags/evidently_drift.py` into Airflow's DAG directory. The DAG
-runs daily at 02:00 UTC and accepts these environment variables:
+For Airflow, the Compose image includes the monitoring package and copies the
+DAG from `dags/evidently_drift.py` into Airflow's DAG directory. The local
+verification schedule runs every 10 minutes. Restore a daily production
+schedule with `MENA_DRIFT_SCHEDULE="0 2 * * *"` after the demonstration. The
+DAG accepts these environment variables:
 
 - `MENA_PROJECT_ROOT`
 - `MENA_DRIFT_REFERENCE`
 - `MENA_DRIFT_CURRENT`
 - `MENA_DRIFT_OUTPUT`
+- `MENA_DRIFT_SCHEDULE` (default: every 10 minutes for local verification)
 
 ## Human feedback and retraining thresholds
 

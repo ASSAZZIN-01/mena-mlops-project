@@ -12,7 +12,7 @@ from pendulum import datetime
 
 @dag(
     dag_id="mena_evidently_drift",
-    schedule="0 2 * * *",
+    schedule=os.getenv("MENA_DRIFT_SCHEDULE", "*/10 * * * *"),
     start_date=datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
     tags=["monitoring", "evidently"],
@@ -37,7 +37,7 @@ def evidently_drift() -> None:
         [
             "cd",
             shlex.quote(project_root),
-            "&& uv run python scripts/run_drift.py",
+            "&& python scripts/run_drift.py",
             "--reference",
             shlex.quote(reference),
             "--current",
