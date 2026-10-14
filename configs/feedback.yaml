@@ -3,6 +3,6 @@ confidence:
   maximum: 0.75
 
 retraining_thresholds:
-  negative: 100
-  neutral: 20
-  positive: 100
+  negative: 5
+  neutral: 1
+  positive: 5

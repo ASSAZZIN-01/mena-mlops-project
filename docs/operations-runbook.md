@@ -95,6 +95,10 @@ uv run python scripts/run_retraining.py \
   --output-dir models/arabert-candidate
 ```
 
+For local verification, the feedback thresholds are intentionally reduced to
+5 negative, 1 neutral, and 5 positive examples. Restore the production
+thresholds in `configs/feedback.yaml` after the demonstration.
+
 ## 4. Export and compare a candidate
 
 Build deployment variants from the experiment output:
