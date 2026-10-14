@@ -6,6 +6,10 @@ from mena_mlops.monitoring.drift import (
     build_monitoring_features,
     run_drift_report,
 )
+from mena_mlops.retraining import (
+    drift_triggered,
+    feedback_thresholds_reached,
+)
 
 
 def test_monitoring_features_do_not_include_raw_text() -> None:
@@ -37,3 +41,27 @@ def test_drift_report_writes_machine_summary(tmp_path) -> None:
     assert (tmp_path / "drift_report.html").is_file()
     saved = json.loads((tmp_path / "drift_summary.json").read_text())
     assert saved["drift_detected"] is True
+
+
+def test_retraining_triggers_when_drift_is_detected_without_feedback() -> None:
+    assert drift_triggered({"drift_detected": True, "psi_alert": False}) is True
+    assert feedback_thresholds_reached(
+        {"negative": 0, "neutral": 0, "positive": 0},
+        {"negative": 5, "neutral": 1, "positive": 5},
+    ) is False
+
+
+def test_retraining_triggers_when_feedback_is_ready_without_drift() -> None:
+    assert drift_triggered({"drift_detected": False, "psi_alert": False}) is False
+    assert feedback_thresholds_reached(
+        {"negative": 5, "neutral": 1, "positive": 5},
+        {"negative": 5, "neutral": 1, "positive": 5},
+    ) is True
+
+
+def test_retraining_skips_when_neither_trigger_is_ready() -> None:
+    assert drift_triggered({"drift_detected": False, "psi_alert": False}) is False
+    assert feedback_thresholds_reached(
+        {"negative": 4, "neutral": 1, "positive": 5},
+        {"negative": 5, "neutral": 1, "positive": 5},
+    ) is False
