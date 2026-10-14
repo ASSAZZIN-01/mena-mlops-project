@@ -151,6 +151,7 @@ services:
       - ./dags:/opt/airflow/dags:ro
       - ./src:/opt/mena-mlops-project/src:ro
       - ./scripts:/opt/mena-mlops-project/scripts:ro
+      - ./configs:/opt/mena-mlops-project/configs:ro
       - ./reports:/opt/mena-mlops-project/reports
       - ./data:/opt/mena-mlops-project/data
       - ${GOOGLE_APPLICATION_CREDENTIALS:-/dev/null}:/run/secrets/gcp-key.json:ro
