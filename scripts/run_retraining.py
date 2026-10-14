@@ -55,6 +55,8 @@ def main() -> None:
         feedback_path = data_dir / "feedback.parquet"
         store.export_reviewed(feedback_path)
         reviewed = pd.read_parquet(feedback_path)
+        reviewed["id"] = reviewed["id"].astype(str)
+        reviewed = reviewed[train.columns]
         combined = pd.concat([train, reviewed], ignore_index=True)
         combined.to_parquet(data_dir / "train.parquet", index=False)
 

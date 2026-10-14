@@ -19,10 +19,13 @@ flowchart LR
     P --> G[Grafana and alerts]
     O --> E[Monitoring windows]
     E --> A[Airflow scheduled Evidently and PSI]
+    A --> G{Drift OR feedback thresholds?}
     F --> U[Streamlit reviewer]
     U --> Q[Retraining thresholds]
-    Q --> T
-    T --> QG[Verified-label quality gate]
+    Q --> G
+    G -->|yes| V[Vertex GPU retraining]
+    G -->|no| X[Skip retraining]
+    V --> QG[Verified-label quality gate]
     QG --> N
 ```
 

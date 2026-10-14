@@ -7,7 +7,11 @@ COPY deploy/airflow/entrypoint.sh /usr/local/bin/mena-airflow-entrypoint
 
 USER airflow
 
-RUN pip install --no-cache-dir "evidently>=0.7" "pandas>=2.2"
+RUN pip install --no-cache-dir \
+    "evidently>=0.7" \
+    "pandas>=2.2" \
+    "google-auth>=2.35" \
+    "google-cloud-storage>=2.18"
 
 ENV PYTHONPATH=/opt/mena-mlops-project/src
 
