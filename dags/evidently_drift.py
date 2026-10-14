@@ -33,6 +33,7 @@ def evidently_drift() -> None:
         "MENA_DRIFT_OUTPUT",
         f"{project_root}/reports/drift",
     )
+    feedback_config = f"{project_root}/configs/feedback.yaml"
     run_report = " ".join(
         [
             "cd",
@@ -56,6 +57,8 @@ def evidently_drift() -> None:
             "cd "
             + shlex.quote(project_root)
             + " && python scripts/submit_vertex_retraining.py"
+            + " --feedback-config "
+            + shlex.quote(feedback_config)
             + " --drift-summary "
             + shlex.quote(f"{output_dir}/drift_summary.json")
         ),
