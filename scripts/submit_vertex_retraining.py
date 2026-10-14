@@ -16,7 +16,11 @@ from google.auth.transport.requests import AuthorizedSession
 from google.cloud import storage
 
 from mena_mlops.feedback import FeedbackStore
-from mena_mlops.retraining import drift_triggered, feedback_thresholds_reached
+from mena_mlops.retraining import (
+    drift_fingerprint,
+    drift_triggered,
+    feedback_thresholds_reached,
+)
 
 TERMINAL_STATES = {
     "JOB_STATE_SUCCEEDED",
@@ -95,20 +99,28 @@ def main() -> None:
         str(label): int(value)
         for label, value in config["retraining_thresholds"].items()
     }
-    counts = FeedbackStore(args.database).counts()
+    store = FeedbackStore(args.database)
+    checkpoint = store.retraining_checkpoint()
+    feedback_upper_bound = store.latest_reviewed_id()
+    counts = store.counts_since(checkpoint.last_feedback_id)
     feedback_ready = feedback_thresholds_reached(counts, thresholds)
     drift_summary = (
         json.loads(args.drift_summary.read_text(encoding="utf-8"))
         if args.drift_summary is not None
         else None
     )
-    drift_ready = drift_triggered(drift_summary)
+    current_drift_fingerprint = drift_fingerprint(drift_summary)
+    drift_ready = (
+        drift_triggered(drift_summary)
+        and current_drift_fingerprint != checkpoint.last_drift_fingerprint
+    )
     if not (feedback_ready or drift_ready):
         print(
             json.dumps(
                 {
                     "status": "skipped",
                     "counts": counts,
+                    "total_counts": store.counts(),
                     "thresholds": thresholds,
                     "feedback_triggered": feedback_ready,
                     "drift_triggered": drift_ready,
@@ -123,7 +135,11 @@ def main() -> None:
     staging_bucket = os.environ["VERTEX_STAGING_BUCKET"].rstrip("/")
     job_id = datetime.now(UTC).strftime("feedback-retraining-%Y%m%d-%H%M%S")
     prefix = f"{staging_bucket}/{job_id}"
-    with tempfile_feedback(args.database) as feedback_path:
+    with tempfile_feedback(
+        args.database,
+        after_id=checkpoint.last_feedback_id,
+        through_id=feedback_upper_bound,
+    ) as feedback_path:
         for split in ("train", "validation", "test"):
             _upload(args.data_dir / f"{split}.parquet", f"{prefix}/{split}.parquet")
         _upload(feedback_path, f"{prefix}/feedback.parquet")
@@ -179,11 +195,24 @@ def main() -> None:
         )
     )
     _submit_and_wait(job_spec, project, region)
+    store.mark_retraining_succeeded(
+        feedback_upper_bound,
+        current_drift_fingerprint
+        if drift_ready
+        else checkpoint.last_drift_fingerprint,
+    )
 
 
 class tempfile_feedback:
-    def __init__(self, database: Path) -> None:
+    def __init__(
+        self,
+        database: Path,
+        after_id: int,
+        through_id: int,
+    ) -> None:
         self.database = database
+        self.after_id = after_id
+        self.through_id = through_id
         self.path: Path | None = None
 
     def __enter__(self) -> Path:
@@ -192,7 +221,11 @@ class tempfile_feedback:
         handle = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
         handle.close()
         self.path = Path(handle.name)
-        FeedbackStore(self.database).export_reviewed(self.path)
+        FeedbackStore(self.database).export_reviewed(
+            self.path,
+            after_id=self.after_id,
+            through_id=self.through_id,
+        )
         return self.path
 
     def __exit__(self, *_: object) -> None:

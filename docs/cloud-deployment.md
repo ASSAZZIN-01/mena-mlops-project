@@ -233,6 +233,13 @@ script receives the generated `drift_summary.json` through `--drift-summary`,
 so a drift-only job does not wait for feedback thresholds. If neither trigger
 is active, the task exits safely without creating a GPU job.
 
+After a successful run, the feedback database records a watermark for the
+highest reviewed feedback ID included in that job. Future checks count and
+stage only reviewed rows after that watermark; the historical rows remain
+available for audit. The watermark is updated only after Vertex succeeds, so
+failed or cancelled jobs are retried with the same feedback batch. A stable
+drift summary is also fingerprinted to avoid resubmitting the same drift event.
+
 ## 6. Vertex quota and job checks
 
 Before submitting a GPU job, check **Quotas & System Limits** for:

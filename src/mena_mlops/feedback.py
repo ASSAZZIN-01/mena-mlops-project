@@ -23,6 +23,14 @@ class FeedbackItem:
     review_status: str
 
 
+@dataclass(frozen=True)
+class RetrainingCheckpoint:
+    """Last successfully consumed feedback and drift event."""
+
+    last_feedback_id: int
+    last_drift_fingerprint: str | None
+
+
 class FeedbackStore:
     """Persist uncertain predictions and reviewed labels in SQLite."""
 
@@ -57,6 +65,16 @@ class FeedbackStore:
                     ADD COLUMN review_status TEXT NOT NULL DEFAULT 'pending'
                     """
                 )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS retraining_state (
+                    id INTEGER PRIMARY KEY CHECK(id = 1),
+                    last_feedback_id INTEGER NOT NULL DEFAULT 0,
+                    last_drift_fingerprint TEXT,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -162,6 +180,31 @@ class FeedbackStore:
             for label in LABELS
         }
 
+    def counts_since(self, feedback_id: int) -> dict[str, int]:
+        """Count reviewed examples newer than a successful retraining."""
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT reviewed_label, COUNT(*) AS count
+                FROM feedback
+                WHERE reviewed_label IS NOT NULL AND id > ?
+                GROUP BY reviewed_label
+                """,
+                (feedback_id,),
+            ).fetchall()
+        return {
+            label: next(
+                (
+                    int(row["count"])
+                    for row in rows
+                    if row["reviewed_label"] == label
+                ),
+                0,
+            )
+            for label in LABELS
+        }
+
     def thresholds_reached(self, thresholds: dict[str, int]) -> bool:
         """Return whether every configured class threshold has been reached."""
 
@@ -171,18 +214,86 @@ class FeedbackStore:
             for label, required in thresholds.items()
         )
 
-    def export_reviewed(self, path: Path) -> int:
-        """Export reviewed examples for training without pending records."""
+    def retraining_checkpoint(self) -> RetrainingCheckpoint:
+        """Return the last successful retraining checkpoint."""
 
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT last_feedback_id, last_drift_fingerprint
+                FROM retraining_state
+                WHERE id = 1
+                """
+            ).fetchone()
+        if row is None:
+            return RetrainingCheckpoint(0, None)
+        return RetrainingCheckpoint(
+            last_feedback_id=int(row["last_feedback_id"]),
+            last_drift_fingerprint=row["last_drift_fingerprint"],
+        )
+
+    def latest_reviewed_id(self) -> int:
+        """Return the highest ID of any reviewed example."""
+
+        with self._connect() as connection:
+            value = connection.execute(
+                """
+                SELECT COALESCE(MAX(id), 0)
+                FROM feedback
+                WHERE reviewed_label IS NOT NULL
+                """
+            ).fetchone()[0]
+        return int(value)
+
+    def mark_retraining_succeeded(
+        self,
+        feedback_id: int,
+        drift_fingerprint: str | None,
+    ) -> None:
+        """Advance the checkpoint after a successful retraining job."""
+
+        if feedback_id < 0:
+            raise ValueError("feedback checkpoint cannot be negative")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO retraining_state (
+                    id, last_feedback_id, last_drift_fingerprint, updated_at
+                )
+                VALUES (1, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    last_feedback_id = excluded.last_feedback_id,
+                    last_drift_fingerprint = excluded.last_drift_fingerprint,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    feedback_id,
+                    drift_fingerprint,
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+
+    def export_reviewed(
+        self,
+        path: Path,
+        after_id: int = 0,
+        through_id: int | None = None,
+    ) -> int:
+        """Export only reviewed examples in a retraining batch."""
+
+        upper_bound = through_id if through_id is not None else 2**63 - 1
         with self._connect() as connection:
             frame = pd.read_sql_query(
                 """
                 SELECT id, text, reviewed_label AS label
                 FROM feedback
                 WHERE reviewed_label IS NOT NULL
+                  AND id > ?
+                  AND id <= ?
                 ORDER BY id
                 """,
                 connection,
+                params=(after_id, upper_bound),
             )
         frame["source"] = "human_feedback"
         path.parent.mkdir(parents=True, exist_ok=True)
