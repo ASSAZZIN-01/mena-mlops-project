@@ -47,6 +47,11 @@ def _submit_and_wait(spec: dict[str, object], project: str, region: str) -> str:
         f"projects/{project}/locations/{region}/customJobs"
     )
     response = session.post(endpoint, json=spec, timeout=60)
+    if response.status_code == 429:
+        raise RuntimeError(
+            "Vertex AI rejected the Custom Job submission with HTTP 429: "
+            f"{response.text[:1000]}"
+        )
     response.raise_for_status()
     job_name = response.json()["name"]
     print(f"Submitted Vertex job: {job_name}", flush=True)
