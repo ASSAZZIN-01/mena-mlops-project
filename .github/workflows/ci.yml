@@ -133,19 +133,19 @@ jobs:
       - name: Wait for service health
         run: |
           endpoints=(
-            "gateway:http://localhost:8080/health"
-            "dashboard:http://localhost:8501/"
-            "feedback-ui:http://localhost:8502/"
-            "grafana:http://localhost:3000/api/health"
-            "mlflow:http://localhost:5000/health"
-            "airflow:http://localhost:8081/health"
-            "prometheus:http://localhost:9090/-/ready"
+            "gateway|http://localhost:8080/health"
+            "dashboard|http://localhost:8501/"
+            "feedback-ui|http://localhost:8502/"
+            "grafana|http://localhost:3000/api/health"
+            "mlflow|http://localhost:5000/health"
+            "airflow|http://localhost:8081/health"
+            "prometheus|http://localhost:9090/-/ready"
           )
           for attempt in {1..60}; do
             ready=true
             for endpoint in "${endpoints[@]}"; do
-              name="${endpoint%%:*}"
-              url="${endpoint#*:}"
+              name="${endpoint%%|*}"
+              url="${endpoint#*|}"
               status="$(curl --connect-timeout 2 --max-time 5 --silent --output /dev/null \
                 --write-out '%{http_code}' "$url" || true)"
               if [[ "$status" != "2"* ]]; then
