@@ -215,14 +215,20 @@ uv run python scripts/check_retraining_gate.py
 ```
 
 In the Compose deployment, Airflow runs the drift report first and then calls
-`scripts/submit_vertex_retraining.py`. The submitter checks the same gate and
-skips safely when it is not ready. When the thresholds are met, it stages the
-processed splits and reviewed feedback in `VERTEX_STAGING_BUCKET`, submits a
-temporary Vertex AI Custom Job, and waits for its terminal state. The job uses
-the configured GPU worker, downloads the staged data, runs
-`scripts/vertex_train.py`, and terminates after training. The training
-container logs the run through the cloud-reachable `MLFLOW_TRACKING_URI` and
-configured GCS artifact location.
+`scripts/submit_vertex_retraining.py` with the generated
+`drift_summary.json`. The submitter uses an OR gate:
+
+- Evidently reports drift or PSI exceeds `0.25`; or
+- all reviewed-feedback thresholds are reached.
+
+It skips safely when neither trigger is ready. When either trigger is ready,
+it stages the processed splits and reviewed feedback in
+`VERTEX_STAGING_BUCKET`, submits a temporary Vertex AI Custom Job, and waits
+for its terminal state. A drift-only trigger is supported; the reviewed
+feedback append can be empty in that case. The job uses the configured GPU
+worker, downloads the staged data, runs `scripts/vertex_train.py`, and
+terminates after training. The training container logs the run through the
+cloud-reachable `MLFLOW_TRACKING_URI` and configured GCS artifact location.
 
 The local MLflow URL (`http://localhost:5000`) cannot be used directly by a
 Vertex worker. To follow the same cloud MLflow server locally, expose it

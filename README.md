@@ -199,13 +199,25 @@ FEEDBACK_DB=data/feedback/reviewed.db \
 uv run streamlit run scripts/feedback_ui.py
 ```
 
-When class thresholds are reached, retrain a candidate:
+Retraining has two independent triggers. A retraining job is submitted when
+**either** the Evidently/PSI drift report raises an alert **or** all configured
+reviewed-feedback class thresholds are reached. This prevents drift from being
+ignored while waiting for human labels, and also supports feedback-driven
+retraining when the data distribution is stable.
+
+When the feedback thresholds are reached, retrain a candidate manually:
 
 ```bash
 uv run python scripts/run_retraining.py \
   --database data/feedback/reviewed.db \
   --output-dir models/arabert-candidate
 ```
+
+In the Airflow deployment, the `mena_evidently_drift` DAG runs the drift
+report and then evaluates both triggers before calling
+`scripts/submit_vertex_retraining.py`. The Vertex job uses the processed
+training data plus any reviewed feedback. A drift-only trigger is valid and
+does not require the feedback thresholds to be met.
 
 Candidate promotion requires verified-label quality metrics:
 

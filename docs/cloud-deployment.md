@@ -80,6 +80,7 @@ To rebuild and publish it from the project workstation:
 
 ```bash
 docker build \
+  -f deploy/training/Dockerfile \
   -t us-central1-docker.pkg.dev/mena-mlops-project/mena-mlops/training:latest \
   .
 docker push \
@@ -220,9 +221,17 @@ docker compose up -d airflow
 curl --fail http://localhost:8081/health
 ```
 
-The DAG runs drift reporting first and then submits a feedback-gated Vertex
-Custom Job. If the thresholds are not met, the submission task exits safely
-without creating a GPU job.
+The DAG runs drift reporting first and then evaluates two independent
+retraining triggers:
+
+1. Evidently reports drift or the maximum PSI exceeds `0.25`.
+2. Reviewed feedback reaches every class threshold in
+   `configs/feedback.yaml`.
+
+The Vertex job is submitted when **either** trigger is true. The submission
+script receives the generated `drift_summary.json` through `--drift-summary`,
+so a drift-only job does not wait for feedback thresholds. If neither trigger
+is active, the task exits safely without creating a GPU job.
 
 ## 6. Vertex quota and job checks
 

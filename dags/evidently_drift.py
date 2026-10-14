@@ -56,6 +56,8 @@ def evidently_drift() -> None:
             "cd "
             + shlex.quote(project_root)
             + " && python scripts/submit_vertex_retraining.py"
+            + " --drift-summary "
+            + shlex.quote(f"{output_dir}/drift_summary.json")
         ),
     )
     drift_report >> retrain

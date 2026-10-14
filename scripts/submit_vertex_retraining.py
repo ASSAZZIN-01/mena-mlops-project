@@ -16,6 +16,7 @@ from google.auth.transport.requests import AuthorizedSession
 from google.cloud import storage
 
 from mena_mlops.feedback import FeedbackStore
+from mena_mlops.retraining import drift_triggered, feedback_thresholds_reached
 
 TERMINAL_STATES = {
     "JOB_STATE_SUCCEEDED",
@@ -80,6 +81,12 @@ def main() -> None:
         type=Path,
         default=Path("configs/feedback.yaml"),
     )
+    parser.add_argument(
+        "--drift-summary",
+        type=Path,
+        default=None,
+        help="Evidently/PSI summary used as an independent retraining trigger.",
+    )
     parser.add_argument("--data-dir", type=Path, default=Path("data/processed"))
     args = parser.parse_args()
 
@@ -89,13 +96,23 @@ def main() -> None:
         for label, value in config["retraining_thresholds"].items()
     }
     counts = FeedbackStore(args.database).counts()
-    if not all(
-        counts.get(label, 0) >= required
-        for label, required in thresholds.items()
-    ):
+    feedback_ready = feedback_thresholds_reached(counts, thresholds)
+    drift_summary = (
+        json.loads(args.drift_summary.read_text(encoding="utf-8"))
+        if args.drift_summary is not None
+        else None
+    )
+    drift_ready = drift_triggered(drift_summary)
+    if not (feedback_ready or drift_ready):
         print(
             json.dumps(
-                {"status": "skipped", "counts": counts, "thresholds": thresholds}
+                {
+                    "status": "skipped",
+                    "counts": counts,
+                    "thresholds": thresholds,
+                    "feedback_triggered": feedback_ready,
+                    "drift_triggered": drift_ready,
+                }
             )
         )
         return
@@ -150,7 +167,17 @@ def main() -> None:
             ],
         },
     }
-    print(json.dumps({"status": "submitted", "counts": counts, "job_id": job_id}))
+    print(
+        json.dumps(
+            {
+                "status": "submitted",
+                "counts": counts,
+                "job_id": job_id,
+                "feedback_triggered": feedback_ready,
+                "drift_triggered": drift_ready,
+            }
+        )
+    )
     _submit_and_wait(job_spec, project, region)
 
 
