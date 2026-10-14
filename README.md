@@ -29,6 +29,8 @@ The complete system architecture is documented in
 
 Operational commands, environment setup, experiment workflows, and evidence
 capture are documented in [`docs/operations-runbook.md`](docs/operations-runbook.md).
+Cloud resources, the MLflow VM, Artifact Registry, and Vertex AI deployment are
+documented in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
 The course-rubric evidence map is in
 [`docs/rubric-evidence.md`](docs/rubric-evidence.md).
 
