@@ -27,6 +27,11 @@ mena-mlops-project/
 The complete system architecture is documented in
 [`docs/architecture.md`](docs/architecture.md).
 
+Operational commands, environment setup, experiment workflows, and evidence
+capture are documented in [`docs/operations-runbook.md`](docs/operations-runbook.md).
+The course-rubric evidence map is in
+[`docs/rubric-evidence.md`](docs/rubric-evidence.md).
+
 ## Getting started
 
 The project targets Python 3.11 or newer and uses `uv` for locked,
@@ -231,7 +236,8 @@ testing remains a controlled Locust command rather than a web-triggered
 operation.
 
 Grafana, Prometheus, MLflow, and Airflow are included in the local Compose stack.
-MLflow uses persistent Compose volumes for its SQLite backend and artifacts.
+MLflow uses a persistent Compose volume for its tracking metadata and the
+configured GCS bucket for artifacts.
 Airflow uses a persistent Compose home volume and is available at
 [`http://localhost:8081`](http://localhost:8081), with the default credentials
 from `.env.example` unless overridden.
