@@ -3,6 +3,7 @@ FROM apache/airflow:2.10.4-python3.12
 COPY pyproject.toml /opt/mena-mlops-project/pyproject.toml
 COPY src /opt/mena-mlops-project/src
 COPY scripts /opt/mena-mlops-project/scripts
+COPY configs /opt/mena-mlops-project/configs
 COPY deploy/airflow/entrypoint.sh /usr/local/bin/mena-airflow-entrypoint
 
 USER airflow
