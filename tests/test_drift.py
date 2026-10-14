@@ -7,6 +7,7 @@ from mena_mlops.monitoring.drift import (
     run_drift_report,
 )
 from mena_mlops.retraining import (
+    drift_fingerprint,
     drift_triggered,
     feedback_thresholds_reached,
 )
@@ -65,3 +66,12 @@ def test_retraining_skips_when_neither_trigger_is_ready() -> None:
         {"negative": 4, "neutral": 1, "positive": 5},
         {"negative": 5, "neutral": 1, "positive": 5},
     ) is False
+
+
+def test_same_drift_summary_has_a_stable_fingerprint() -> None:
+    summary = {"drift_detected": True, "psi_alert": False, "max_psi": 0.4}
+
+    assert drift_fingerprint(summary) == drift_fingerprint(
+        dict(reversed(summary.items()))
+    )
+    assert drift_fingerprint({"drift_detected": False, "psi_alert": False}) is None

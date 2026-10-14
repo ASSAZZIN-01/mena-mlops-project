@@ -42,7 +42,13 @@ def main() -> None:
         for label, value in feedback_config["retraining_thresholds"].items()
     }
     store = FeedbackStore(args.database)
-    if not store.thresholds_reached(thresholds):
+    checkpoint = store.retraining_checkpoint()
+    feedback_upper_bound = store.latest_reviewed_id()
+    counts = store.counts_since(checkpoint.last_feedback_id)
+    if not all(
+        counts.get(label, 0) >= required
+        for label, required in thresholds.items()
+    ):
         raise SystemExit("Retraining gate is not ready; thresholds have not been met.")
 
     training_config = load_yaml(args.training_config)
@@ -53,7 +59,11 @@ def main() -> None:
             shutil.copy2(source_dir / f"{split}.parquet", data_dir / f"{split}.parquet")
         train = pd.read_parquet(source_dir / "train.parquet")
         feedback_path = data_dir / "feedback.parquet"
-        store.export_reviewed(feedback_path)
+        store.export_reviewed(
+            feedback_path,
+            after_id=checkpoint.last_feedback_id,
+            through_id=feedback_upper_bound,
+        )
         reviewed = pd.read_parquet(feedback_path)
         reviewed["id"] = reviewed["id"].astype(str)
         reviewed = reviewed[train.columns]
@@ -70,6 +80,10 @@ def main() -> None:
             yaml.safe_dump(candidate_config, config_file)
             config_path = Path(config_file.name)
         run_id = run_training(config_path)
+    store.mark_retraining_succeeded(
+            feedback_upper_bound,
+            checkpoint.last_drift_fingerprint,
+    )
     print(f"MLflow candidate run: {run_id}")
 
 
