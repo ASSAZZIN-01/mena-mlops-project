@@ -132,14 +132,28 @@ jobs:
         run: docker compose up --build -d
       - name: Wait for service health
         run: |
+          endpoints=(
+            "gateway:http://localhost:8080/health"
+            "dashboard:http://localhost:8501/"
+            "feedback-ui:http://localhost:8502/"
+            "grafana:http://localhost:3000/api/health"
+            "mlflow:http://localhost:5000/health"
+            "airflow:http://localhost:8081/health"
+            "prometheus:http://localhost:9090/-/ready"
+          )
           for attempt in {1..60}; do
-            if curl --fail --silent http://localhost:8080/health >/dev/null &&
-               curl --fail --silent http://localhost:8501/ >/dev/null &&
-               curl --fail --silent http://localhost:8502/ >/dev/null &&
-               curl --fail --silent http://localhost:3000/api/health >/dev/null &&
-               curl --fail --silent http://localhost:5000/health >/dev/null &&
-               curl --fail --silent http://localhost:8081/health >/dev/null &&
-               curl --fail --silent http://localhost:9090/-/ready >/dev/null; then
+            ready=true
+            for endpoint in "${endpoints[@]}"; do
+              name="${endpoint%%:*}"
+              url="${endpoint#*:}"
+              status="$(curl --connect-timeout 2 --max-time 5 --silent --output /dev/null \
+                --write-out '%{http_code}' "$url" || true)"
+              if [[ "$status" != "2"* ]]; then
+                ready=false
+                printf 'attempt %s: %s is not ready (HTTP %s)\n' "$attempt" "$name" "$status"
+              fi
+            done
+            if [[ "$ready" == true ]]; then
               exit 0
             fi
             sleep 10
