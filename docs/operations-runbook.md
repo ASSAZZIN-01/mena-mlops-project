@@ -91,13 +91,49 @@ The feedback gate belongs to production retraining instead:
 ```bash
 uv run python scripts/check_retraining_gate.py
 uv run python scripts/run_retraining.py \
-  --database data/feedback/reviewed.db \
-  --output-dir models/arabert-candidate
+  --database data/feedback/reviewed.db
 ```
 
-For local verification, the feedback thresholds are intentionally reduced to
+The compatibility command delegates to the authenticated Vertex GPU
+submission path and does not train locally. For local verification, the
+feedback thresholds are intentionally reduced to
 5 negative, 1 neutral, and 5 positive examples. Restore the production
 thresholds in `configs/feedback.yaml` after the demonstration.
+
+The normal full-data training path is the `mena_scheduled_training` Airflow
+DAG, scheduled for 03:00 in `MENA_TRAINING_TIMEZONE` (UTC by default). Its
+task log starts with `03:00 <timezone> scheduled training` and includes the
+Vertex job ID, state polling, release decision, and final task result. Trigger
+it manually for a controlled verification:
+
+```bash
+airflow dags trigger mena_scheduled_training
+```
+
+## 3.1 Inference runtime selection
+
+The inference image is separate from the training image and contains no
+PyTorch dependency. It serves the published ONNX representation through CPU
+ONNX Runtime by default:
+
+```bash
+ONNXRUNTIME_PACKAGE=onnxruntime INFERENCE_DEVICE=cpu \
+docker compose up -d --build model-stable model-candidate feedback-consumer
+```
+
+For a GPU inference host with compatible CUDA libraries, select the GPU
+runtime explicitly:
+
+```bash
+ONNXRUNTIME_PACKAGE=onnxruntime-gpu \
+INFERENCE_DEVICE=cuda \
+ONNX_PROVIDERS=CUDAExecutionProvider,CPUExecutionProvider \
+docker compose up -d --build model-stable model-candidate feedback-consumer
+```
+
+Provider selection is validated at startup. The service fails clearly when a
+requested provider is not available instead of silently falling back to an
+unexpected execution backend.
 
 ## 4. Export and compare a candidate
 
