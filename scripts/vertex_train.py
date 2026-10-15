@@ -12,6 +12,7 @@ import torch
 import yaml
 from google.cloud import storage
 
+from mena_mlops.promotion import evaluate_and_gate_candidate
 from mena_mlops.training.train import load_yaml, run_training
 
 
@@ -22,6 +23,18 @@ def _download(uri: str, destination: Path) -> None:
     client = storage.Client()
     bucket = client.bucket(parsed.netloc)
     bucket.blob(parsed.path.lstrip("/")).download_to_filename(destination)
+
+
+def _upload_directory(directory: Path, prefix: str) -> None:
+    parsed = urlparse(prefix)
+    if parsed.scheme != "gs" or not parsed.netloc:
+        raise ValueError(f"expected a GCS prefix, got {prefix!r}")
+    bucket = storage.Client().bucket(parsed.netloc)
+    for path in directory.iterdir():
+        if path.is_file():
+            bucket.blob(
+                f"{parsed.path.lstrip('/')}/{path.name}"
+            ).upload_from_filename(path)
 
 
 def main() -> None:
@@ -66,7 +79,38 @@ def main() -> None:
         config_path = root / "training.yaml"
         config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
         run_id = run_training(config_path)
-        print(f"MLflow candidate run: {run_id}")
+        promotion_config = load_yaml(Path("configs/promotion.yaml"))
+        quality_config = load_yaml(Path("configs/quality.yaml"))
+        gate = promotion_config["quality_gate"]
+        optimization = quality_config["optimization"]
+        decision = evaluate_and_gate_candidate(
+            root / "model",
+            data_dir / "test.parquet",
+            root / "variants",
+            root / "reports" / "promotion_decision.json",
+            stable_macro_f1=float(
+                quality_config["model_quality"]["baseline_test_macro_f1"]
+            ),
+            minimum_macro_f1=float(gate["minimum_macro_f1"]),
+            minimum_improvement=float(gate["minimum_improvement"]),
+            minimum_class_f1={
+                str(label): float(value)
+                for label, value in gate["minimum_class_f1"].items()
+            },
+            maximum_macro_f1_drop_percent=float(
+                optimization["maximum_macro_f1_drop_percent"]
+            ),
+            max_length=int(config["training"]["max_length"]),
+        )
+        release_prefix = f"{input_prefix}/release"
+        _upload_directory(root / "variants", release_prefix)
+        _upload_directory(root / "reports", release_prefix)
+        print(
+            f"MLflow candidate run: {run_id}; "
+            f"promotion status: {decision['status']}; "
+            f"selected variant: {decision['selected_variant']}",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
