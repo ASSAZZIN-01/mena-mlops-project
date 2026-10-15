@@ -259,8 +259,11 @@ uv run python scripts/deploy_approved_candidate.py \
 
 The deployment command refuses rejected decisions, verifies the selected ONNX
 model files, starts `model-candidate`, and configures Nginx with
-stable/candidate weights. Increase the canary only after checking health,
-errors, latency, and model-version traffic; roll back with
+stable/candidate weights. By default it then runs the automatic canary:
+5% → 20% → 50% → 100%, observing each stage for 10 minutes and rolling back
+to stable automatically if candidate health, error rate, p95 latency, or the
+prediction contract fails. Use `--manual-canary` to keep the candidate at 5%
+and control traffic manually; roll back with
 `uv run python scripts/canary.py --rollback`.
 
 ## CPU optimization
