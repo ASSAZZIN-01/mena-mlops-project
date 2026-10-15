@@ -139,7 +139,7 @@ def main() -> None:
         release_prefix = f"{input_prefix}/release"
         _upload_directory(root / "variants", release_prefix)
         _upload_directory(root / "reports", release_prefix)
-        _upload_directory(root / "model-card", release_prefix)
+        _upload_directory(root / "model-card", f"{release_prefix}/model-card")
         emit_event(
             "retraining_release_completed",
             "automatic_retraining",

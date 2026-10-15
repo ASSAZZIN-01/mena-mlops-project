@@ -192,7 +192,8 @@ uv run python scripts/check_release_readiness.py \
 
 Only an `APPROVED` result should be deployed. The guarded deployment command
 downloads the approved ONNX INT8 bundle, starts the candidate slot and
-Prometheus, and sends 5% of gateway traffic to it:
+Prometheus, validates `model-card/model_card.json`, writes
+`deployment_identity.json`, and sends 5% of gateway traffic to it:
 
 ```bash
 uv run python scripts/deploy_approved_candidate.py \
@@ -205,6 +206,20 @@ directory. By default it automatically progresses through 5%, 20%, 50%, and
 to 100% stable on a failed health, error-rate, p95-latency, or prediction
 contract check. Use `--manual-canary` to stop at 5% and control the split
 manually.
+
+`deployment_identity.json` is the explicit deployment-to-card pointer. It
+records the model ID, model-card URI, model-card SHA-256, release URI,
+promotion decision URI and hash, selected variant, candidate stage, and
+deployment timestamp. A release without an approved matching model card is
+refused before Docker Compose is started.
+
+Automatic feedback/PSI retraining follows the same contract. The Airflow DAG
+submits the Vertex job; [vertex_train.py](../scripts/vertex_train.py) trains,
+evaluates, promotes, and publishes `model-card/model_card.json` beside the
+release artifacts. Airflow does not deploy every approved retraining result
+directly. When that release is sent through
+`deploy_approved_candidate.py`, the same validation and
+`deployment_identity.json` pointer are created.
 
 The deployment command requires the host environment to load the project
 credentials before reading a GCS release:
