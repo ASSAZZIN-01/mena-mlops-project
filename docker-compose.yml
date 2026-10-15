@@ -150,7 +150,7 @@ services:
       VERTEX_STAGING_BUCKET: ${VERTEX_STAGING_BUCKET:-gs://mena-mlops-project-dvc/vertex-staging}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
       MLFLOW_ARTIFACT_LOCATION: ${MLFLOW_ARTIFACT_LOCATION:-gs://mena-mlops-project-dvc/mlflow}
-      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-key.json
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/mena-gcp-key.json
     volumes:
       - airflow-home:/opt/airflow
       - ./dags:/opt/airflow/dags:ro

@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -s /run/secrets/gcp-key.json ]]; then
+    install -o airflow -g root -m 0400 \
+        /run/secrets/gcp-key.json /tmp/mena-gcp-key.json
+else
+    rm -f /tmp/mena-gcp-key.json
+fi
+
 chown airflow:root /opt/airflow
 mkdir -p /opt/airflow/logs /opt/airflow/plugins
 find /opt/airflow -mindepth 1 -path /opt/airflow/dags -prune -o \
