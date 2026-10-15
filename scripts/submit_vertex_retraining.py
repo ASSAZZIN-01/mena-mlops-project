@@ -18,6 +18,7 @@ from google.auth.transport.requests import AuthorizedSession
 from google.cloud import storage
 
 from mena_mlops.feedback import FeedbackStore
+from mena_mlops.observability import emit_event
 from mena_mlops.retraining import (
     drift_fingerprint,
     drift_triggered,
@@ -76,13 +77,23 @@ def _submit_and_wait(spec: dict[str, object], project: str, region: str) -> str:
         )
     response.raise_for_status()
     job_name = response.json()["name"]
-    print(f"Submitted Vertex job: {job_name}", flush=True)
+    emit_event(
+        "vertex_job_submitted",
+        "automatic_retraining",
+        status="submitted",
+        job_name=job_name,
+    )
     job_endpoint = f"https://{region}-aiplatform.googleapis.com/v1/{job_name}"
     while True:
         job = session.get(job_endpoint, timeout=60)
         job.raise_for_status()
         state = str(job.json().get("state", ""))
-        print(f"Vertex job state: {state}", flush=True)
+        emit_event(
+            "vertex_job_state",
+            "automatic_retraining",
+            status=state.removeprefix("JOB_STATE_").lower(),
+            job_name=job_name,
+        )
         if state in TERMINAL_STATES:
             if state != "JOB_STATE_SUCCEEDED":
                 raise RuntimeError(f"Vertex job finished unsuccessfully: {state}")
@@ -142,17 +153,15 @@ def main() -> None:
         and current_drift_fingerprint != checkpoint.last_drift_fingerprint
     )
     if not args.manual and not (feedback_ready or drift_ready):
-        print(
-            json.dumps(
-                {
-                    "status": "skipped",
-                    "counts": counts,
-                    "total_counts": store.counts(),
-                    "thresholds": thresholds,
-                    "feedback_triggered": feedback_ready,
-                    "drift_triggered": drift_ready,
-                }
-            )
+        emit_event(
+            "retraining_skipped",
+            "automatic_retraining",
+            status="skipped",
+            counts=counts,
+            total_counts=store.counts(),
+            thresholds=thresholds,
+            feedback_triggered=feedback_ready,
+            drift_triggered=drift_ready,
         )
         return
 
@@ -241,17 +250,15 @@ def main() -> None:
             ],
         },
     }
-    print(
-        json.dumps(
-            {
-                "status": "submitted",
-                "counts": counts,
-                "job_id": job_id,
-                "feedback_triggered": feedback_ready,
-                "drift_triggered": drift_ready,
-                "manual": args.manual,
-            }
-        )
+    emit_event(
+        "retraining_submission_started",
+        "automatic_retraining",
+        status="started",
+        counts=counts,
+        model_id=job_id,
+        feedback_triggered=feedback_ready,
+        drift_triggered=drift_ready,
+        manual=args.manual,
     )
     _submit_and_wait(job_spec, project, region)
     if not args.manual:

@@ -125,7 +125,17 @@ exact Git/DVC lineage, configurations, split hashes, MLflow run, Vertex job,
 hardware image, evaluation, and release artifact hashes. Automatic Vertex
 retraining publishes the same two files beside its release artifacts.
 
-## 3.1 Inference runtime selection
+## 3.1 Structured lifecycle logs
+
+Training, Vertex submission/state changes, promotion, deployment, canary
+stages, and rollback now emit one JSON object per lifecycle event. Events
+include `timestamp`, `event_type`, `component`, `status`, and correlation
+fields such as `model_id`, `release_id`, `vertex_training_job_id`, and
+`mlflow_run_id` when available. Use `event_type` and `status` as the primary
+filters when diagnosing a failed promotion, deployment, canary stage, or
+automatic rollback.
+
+## 3.2 Inference runtime selection
 
 The inference image is separate from the training image and contains no
 PyTorch dependency. It serves the published ONNX representation through CPU

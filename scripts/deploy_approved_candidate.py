@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 
 from google.cloud import storage
 
+from mena_mlops.observability import emit_event
+
 
 def _read_decision(uri: str) -> dict[str, object]:
     parsed = urlparse(uri)
@@ -109,10 +111,21 @@ def main() -> None:
         raise RuntimeError(f"release bundle is missing: {', '.join(missing)}")
 
     stable_percent = 100 - args.candidate_percent
-    print(f"Downloaded approved release to {args.output_dir}")
-    print(
-        f"Starting candidate canary: stable={stable_percent}% "
-        f"candidate={args.candidate_percent}%"
+    emit_event(
+        "deployment_release_downloaded",
+        "deployment",
+        status="approved",
+        decision_uri=args.decision,
+        output_dir=str(args.output_dir),
+        selected_variant=selected_variant,
+        model_file=model_file,
+    )
+    emit_event(
+        "deployment_canary_started",
+        "deployment",
+        status="started",
+        stable_percent=stable_percent,
+        candidate_percent=args.candidate_percent,
     )
     if not args.skip_compose:
         environment = os.environ.copy()
@@ -139,7 +152,7 @@ def main() -> None:
             check=True,
             env=environment,
         )
-        print("Candidate service and Nginx canary started.")
+        emit_event("candidate_services_started", "deployment", status="running")
         if not args.manual_canary:
             subprocess.run(
                 [
@@ -154,7 +167,11 @@ def main() -> None:
                 env=environment,
             )
     else:
-        print("Compose start skipped; use the printed environment values to deploy.")
+        emit_event(
+            "candidate_services_start_skipped",
+            "deployment",
+            status="skipped",
+        )
 
 
 if __name__ == "__main__":

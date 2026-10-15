@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from mena_mlops.deployment.canary import apply_split, split_for_candidate
+from mena_mlops.observability import emit_error, emit_event
 
 
 def _json_request(url: str, payload: dict[str, object] | None = None) -> object:
@@ -128,18 +129,37 @@ def run_canary(
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
     for candidate_percent in stages:
-        print(f"Canary stage: candidate={candidate_percent}%", flush=True)
+        stage_started = time.monotonic()
+        emit_event(
+            "canary_stage_started",
+            "canary",
+            status="started",
+            candidate_percent=candidate_percent,
+            duration_seconds=duration_seconds,
+        )
         apply(split_for_candidate(candidate_percent))
         contract_failure = _check_prediction_contract(gateway_url, probes)
         if contract_failure is not None:
             apply(split_for_candidate(0))
+            emit_event(
+                "canary_rollback",
+                "canary",
+                severity="ERROR",
+                status="failed",
+                candidate_percent=candidate_percent,
+                reason=contract_failure,
+                duration_ms=round((time.monotonic() - stage_started) * 1000, 2),
+            )
             raise RuntimeError(
                 f"Canary stage {candidate_percent}% failed: {contract_failure}"
             )
         if duration_seconds:
-            print(
-                f"Observing for {duration_seconds} seconds...",
-                flush=True,
+            emit_event(
+                "canary_observation_started",
+                "canary",
+                status="running",
+                candidate_percent=candidate_percent,
+                duration_seconds=duration_seconds,
             )
             sleep(duration_seconds)
         failures = check_stage(
@@ -151,11 +171,26 @@ def run_canary(
         )
         if failures:
             apply(split_for_candidate(0))
+            emit_event(
+                "canary_rollback",
+                "canary",
+                severity="ERROR",
+                status="failed",
+                candidate_percent=candidate_percent,
+                failures=failures,
+                duration_ms=round((time.monotonic() - stage_started) * 1000, 2),
+            )
             raise RuntimeError(
                 f"Canary stage {candidate_percent}% failed: "
                 + "; ".join(failures)
             )
-        print(f"Canary stage {candidate_percent}% passed", flush=True)
+        emit_event(
+            "canary_stage_completed",
+            "canary",
+            status="passed",
+            candidate_percent=candidate_percent,
+            duration_ms=round((time.monotonic() - stage_started) * 1000, 2),
+        )
 
 
 def main() -> None:
@@ -178,8 +213,9 @@ def main() -> None:
             max_p95_seconds=args.max_p95_seconds,
             probes=args.probes,
         )
-    except Exception:
+    except Exception as error:
         apply_split(split_for_candidate(0))
+        emit_error("canary_run_failed", "canary", error, rollback_percent=0)
         raise
 
 

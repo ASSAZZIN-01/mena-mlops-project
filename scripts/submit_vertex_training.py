@@ -16,6 +16,8 @@ import google.auth
 from google.auth.transport.requests import AuthorizedSession
 from google.cloud import storage
 
+from mena_mlops.observability import emit_event
+
 TERMINAL_STATES = {
     "JOB_STATE_SUCCEEDED",
     "JOB_STATE_FAILED",
@@ -60,13 +62,23 @@ def _submit_and_wait(spec: dict[str, object], project: str, region: str) -> str:
     response = session.post(endpoint, json=spec, timeout=60)
     response.raise_for_status()
     job_name = response.json()["name"]
-    print(f"Submitted Vertex manual training job: {job_name}", flush=True)
+    emit_event(
+        "vertex_job_submitted",
+        "manual_training",
+        status="submitted",
+        job_name=job_name,
+    )
     job_endpoint = f"https://{region}-aiplatform.googleapis.com/v1/{job_name}"
     while True:
         job = session.get(job_endpoint, timeout=60)
         job.raise_for_status()
         state = str(job.json().get("state", ""))
-        print(f"Vertex job state: {state}", flush=True)
+        emit_event(
+            "vertex_job_state",
+            "manual_training",
+            status=state.removeprefix("JOB_STATE_").lower(),
+            job_name=job_name,
+        )
         if state in TERMINAL_STATES:
             if state != "JOB_STATE_SUCCEEDED":
                 raise RuntimeError(f"Vertex job finished unsuccessfully: {state}")
@@ -171,12 +183,21 @@ def main() -> None:
             ]
         },
     }
-    print(
-        f"Submitting {job_id} with config {args.config} to "
-        f"{os.getenv('VERTEX_ACCELERATOR_TYPE', 'NVIDIA_TESLA_T4')}",
-        flush=True,
+    emit_event(
+        "vertex_job_submission_started",
+        "manual_training",
+        status="started",
+        model_id=job_id,
+        config=str(args.config),
+        accelerator=os.getenv("VERTEX_ACCELERATOR_TYPE", "NVIDIA_TESLA_T4"),
     )
-    print(_submit_and_wait(job_spec, project, region), flush=True)
+    emit_event(
+        "vertex_job_completed",
+        "manual_training",
+        status="succeeded",
+        job_name=_submit_and_wait(job_spec, project, region),
+        model_id=job_id,
+    )
 
 
 if __name__ == "__main__":

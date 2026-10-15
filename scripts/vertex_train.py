@@ -14,6 +14,7 @@ import yaml
 from google.cloud import storage
 
 from mena_mlops.model_card import build_model_card, write_model_card
+from mena_mlops.observability import emit_event
 from mena_mlops.promotion import evaluate_and_gate_candidate
 from mena_mlops.training.train import load_yaml, run_training
 
@@ -82,11 +83,13 @@ def main() -> None:
                 f"torch={torch.__version__}, cuda_build={torch.version.cuda}, "
                 f"device_count={torch.cuda.device_count()}"
             )
-        print(
-            "Vertex GPU: "
-            f"{torch.cuda.get_device_name(0)} "
-            f"(torch={torch.__version__}, cuda_build={torch.version.cuda})",
-            flush=True,
+        emit_event(
+            "vertex_training_started",
+            "automatic_retraining",
+            status="running",
+            accelerator=torch.cuda.get_device_name(0),
+            torch_version=torch.__version__,
+            cuda_build=torch.version.cuda,
         )
         config["training"]["device"] = "cuda"
         config_path = root / "training.yaml"
@@ -137,11 +140,13 @@ def main() -> None:
         _upload_directory(root / "variants", release_prefix)
         _upload_directory(root / "reports", release_prefix)
         _upload_directory(root / "model-card", release_prefix)
-        print(
-            f"MLflow candidate run: {run_id}; "
-            f"promotion status: {decision['status']}; "
-            f"selected variant: {decision['selected_variant']}",
-            flush=True,
+        emit_event(
+            "retraining_release_completed",
+            "automatic_retraining",
+            status=decision["status"],
+            mlflow_run_id=run_id,
+            selected_variant=decision["selected_variant"],
+            release_prefix=release_prefix,
         )
 
 
