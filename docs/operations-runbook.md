@@ -122,6 +122,26 @@ optimization gate and the promotion gate are separate decisions.
 
 ## 5. Deploy a candidate and run a canary
 
+For an automatically evaluated Vertex release, inspect the decision first:
+
+```bash
+uv run python scripts/check_release_readiness.py \
+  --decision gs://mena-mlops-project-dvc/vertex-staging/<job-id>/release/promotion_decision.json
+```
+
+Only an `APPROVED` result should be deployed. The guarded deployment command
+downloads the approved ONNX INT8 bundle, starts the candidate slot, and sends
+5% of gateway traffic to it:
+
+```bash
+uv run python scripts/deploy_approved_candidate.py \
+  --decision gs://mena-mlops-project-dvc/vertex-staging/<job-id>/release/promotion_decision.json
+```
+
+The command refuses rejected decisions and never changes the stable model
+directory. Use the existing canary controls to increase traffic gradually or
+roll back.
+
 Point the candidate slot at a distinct immutable artifact:
 
 ```bash

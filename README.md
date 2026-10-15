@@ -242,6 +242,27 @@ production-ready. The local Nginx canary remains an explicit deployment
 operation so a rejected or unhealthy candidate cannot change production
 traffic automatically.
 
+Inspect a decision directly from the Vertex staging bucket:
+
+```bash
+uv run python scripts/check_release_readiness.py \
+  --decision gs://mena-mlops-project-dvc/vertex-staging/<job-id>/release/promotion_decision.json
+```
+
+An approved bundle can be downloaded and launched into the local candidate
+slot with a 5% canary:
+
+```bash
+uv run python scripts/deploy_approved_candidate.py \
+  --decision gs://mena-mlops-project-dvc/vertex-staging/<job-id>/release/promotion_decision.json
+```
+
+The deployment command refuses rejected decisions, verifies the selected ONNX
+model files, starts `model-candidate`, and configures Nginx with
+stable/candidate weights. Increase the canary only after checking health,
+errors, latency, and model-version traffic; roll back with
+`uv run python scripts/canary.py --rollback`.
+
 ## CPU optimization
 
 ### Reviewer model bootstrap
