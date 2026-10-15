@@ -48,7 +48,7 @@ def _check_prediction_contract(gateway_url: str, probes: int) -> str | None:
             f"{gateway_url.rstrip('/')}/predict",
             {
                 "text": "هذا المنتج ممتاز",
-                "source": "automatic-canary",
+                "source": "live",
                 "input_id": f"canary-{index}",
             },
         )
