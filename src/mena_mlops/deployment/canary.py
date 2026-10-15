@@ -28,12 +28,17 @@ def apply_split(split: TrafficSplit) -> None:
     environment["STABLE_WEIGHT"] = str(split.stable)
     environment["CANDIDATE_WEIGHT"] = str(split.candidate)
     subprocess.run(
+        ["docker", "compose", "rm", "-sf", "nginx"],
+        env=environment,
+        check=True,
+    )
+    subprocess.run(
         [
             "docker",
             "compose",
             "up",
             "-d",
-            "--force-recreate",
+            "--no-deps",
             "nginx",
         ],
         env=environment,

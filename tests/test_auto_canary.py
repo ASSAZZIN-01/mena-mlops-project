@@ -46,3 +46,28 @@ def test_prediction_probe_uses_supported_live_source(monkeypatch) -> None:
 
     assert auto_canary._check_prediction_contract("http://gateway", 1) is None
     assert requests[0]["source"] == "live"
+
+
+def test_contract_failure_rolls_back_to_stable(monkeypatch) -> None:
+    applied = []
+    monkeypatch.setattr(
+        auto_canary,
+        "_check_prediction_contract",
+        lambda *_: "invalid prediction contract",
+    )
+
+    try:
+        auto_canary.run_canary(
+            prometheus_url="http://prometheus",
+            gateway_url="http://gateway",
+            stages=(5,),
+            duration_seconds=0,
+            apply=applied.append,
+            sleep=lambda _: None,
+        )
+    except RuntimeError as error:
+        assert "invalid prediction contract" in str(error)
+    else:
+        raise AssertionError("expected the canary stage to fail")
+
+    assert [split.candidate for split in applied] == [5, 0]
