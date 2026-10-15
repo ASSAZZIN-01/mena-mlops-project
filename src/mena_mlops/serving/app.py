@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from uuid import uuid4
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
@@ -14,6 +15,8 @@ from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+from mena_mlops.observability import emit_error, emit_event
 
 
 class Predictor(Protocol):
@@ -66,6 +69,17 @@ LATENCY = Histogram(
     "mena_model_request_latency_seconds",
     "Prediction request latency in seconds.",
     ["route", "model_version"],
+)
+PREDICTIONS = Counter(
+    "mena_gateway_predictions_total",
+    "Prediction outcomes emitted by the gateway.",
+    ["label", "model_version", "deployment_stage"],
+)
+CONFIDENCE = Histogram(
+    "mena_gateway_prediction_confidence",
+    "Prediction confidence emitted by the gateway.",
+    ["label", "model_version", "deployment_stage"],
+    buckets=(0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0),
 )
 
 
@@ -203,18 +217,61 @@ def create_app(predictor: Predictor | None = None) -> FastAPI:
         if loaded is None:
             raise HTTPException(status_code=503, detail="model is not loaded")
         started = time.perf_counter()
+        request_id = request.headers.get("x-request-id") or str(uuid4())
+        deployment_stage = os.getenv("DEPLOYMENT_STAGE", "stable")
+        status = "success"
         try:
             label, probabilities = loaded.predict(payload.text)
+            confidence = probabilities[label]
+            PREDICTIONS.labels(
+                label, loaded.model_version, deployment_stage
+            ).inc()
+            CONFIDENCE.labels(
+                label, loaded.model_version, deployment_stage
+            ).observe(confidence)
+            emit_event(
+                "prediction_completed",
+                "gateway",
+                status="success",
+                request_id=request_id,
+                source=request.headers.get("x-source", "live"),
+                input_chars=len(payload.text),
+                label=label,
+                confidence=confidence,
+                model_version=loaded.model_version,
+                deployment_stage=deployment_stage,
+            )
             return PredictionResponse(
                 label=label,
                 probabilities=probabilities,
                 model_version=loaded.model_version,
             )
+        except Exception as error:
+            status = "error"
+            emit_error(
+                "prediction_failed",
+                "gateway",
+                error,
+                request_id=request_id,
+                model_version=loaded.model_version,
+                deployment_stage=deployment_stage,
+            )
+            raise
         finally:
             elapsed = time.perf_counter() - started
             route = request.url.path
-            REQUESTS.labels(route, "success", loaded.model_version).inc()
+            REQUESTS.labels(route, status, loaded.model_version).inc()
             LATENCY.labels(route, loaded.model_version).observe(elapsed)
+            if status == "success":
+                emit_event(
+                    "prediction_latency_recorded",
+                    "gateway",
+                    status="success",
+                    request_id=request_id,
+                    latency_ms=round(elapsed * 1000, 3),
+                    model_version=loaded.model_version,
+                    deployment_stage=deployment_stage,
+                )
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> PlainTextResponse:

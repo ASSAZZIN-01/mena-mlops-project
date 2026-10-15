@@ -88,6 +88,15 @@ The serving services persist every live and batch prediction in
 input ID, text, prediction, confidence, probabilities, model version, and
 whether human review is required.
 
+Each synchronous prediction also emits a structured JSON event without
+including the raw text. The event contains a request ID (from `X-Request-ID`
+when supplied), source, input length, label, confidence, model version,
+deployment stage, and latency. Prometheus exposes gateway-level
+`mena_gateway_predictions_total`, `mena_gateway_prediction_confidence`,
+`mena_model_predictions_total`, and `mena_model_prediction_confidence`
+metrics; source and deployment stage are bounded labels and must not contain
+user text or IDs.
+
 Publish an input event from another terminal:
 
 ```bash
