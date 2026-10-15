@@ -130,8 +130,8 @@ uv run python scripts/check_release_readiness.py \
 ```
 
 Only an `APPROVED` result should be deployed. The guarded deployment command
-downloads the approved ONNX INT8 bundle, starts the candidate slot, and sends
-5% of gateway traffic to it:
+downloads the approved ONNX INT8 bundle, starts the candidate slot and
+Prometheus, and sends 5% of gateway traffic to it:
 
 ```bash
 uv run python scripts/deploy_approved_candidate.py \
@@ -144,6 +144,29 @@ directory. By default it automatically progresses through 5%, 20%, 50%, and
 to 100% stable on a failed health, error-rate, p95-latency, or prediction
 contract check. Use `--manual-canary` to stop at 5% and control the split
 manually.
+
+The deployment command requires the host environment to load the project
+credentials before reading a GCS release:
+
+```bash
+source /home/az-wsl/setup_env.sh
+set -a
+source .env
+set +a
+```
+
+If Docker Desktop reports a file/directory bind-mount mismatch for Nginx or
+Prometheus, recreate only the affected service; do not remove persistent
+PostgreSQL or Airflow volumes:
+
+```bash
+docker compose rm -sf nginx prometheus
+docker compose up -d prometheus nginx
+curl --fail http://localhost:9090/-/ready
+```
+
+The canary controller removes and recreates only Nginx for each traffic split,
+so model containers and their health state are not unnecessarily restarted.
 
 Point the candidate slot at a distinct immutable artifact:
 

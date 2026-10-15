@@ -127,7 +127,15 @@ def main() -> None:
             }
         )
         subprocess.run(
-            ["docker", "compose", "up", "-d", "model-candidate", "nginx"],
+            [
+                "docker",
+                "compose",
+                "up",
+                "-d",
+                "model-candidate",
+                "prometheus",
+                "nginx",
+            ],
             check=True,
             env=environment,
         )

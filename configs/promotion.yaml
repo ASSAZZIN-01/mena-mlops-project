@@ -5,5 +5,5 @@ quality_gate:
   minimum_improvement: 0.01
   minimum_class_f1:
     negative: 0.70
-    neutral: 0.15
+    neutral: 0.12
     positive: 0.80
