@@ -100,6 +100,31 @@ retraining when PSI/Evidently drift or reviewed-feedback thresholds trigger.
 The manual command uses the selected training YAML unchanged, while the
 automatic retraining path has its own trigger, release, and watermark logic.
 
+After manual evaluation and promotion, create the immutable identity bundle
+from the same model, split, and promotion decision:
+
+```bash
+uv run python scripts/create_model_card.py \
+  --model-id manual-training-<job-id> \
+  --training-job-id <vertex-job-name> \
+  --mlflow-run-id <mlflow-run-id> \
+  --training-config configs/training-vertex-debug.yaml \
+  --data-config configs/data-vertex-debug.yaml \
+  --data-dir data/processed \
+  --model-dir models/arabert-candidate \
+  --release-dir models/arabert-candidate-variants \
+  --evaluation reports/training/evaluation.json \
+  --decision reports/promotion/promotion_decision.json \
+  --output-dir reports/model-card \
+  --training-image "$VERTEX_TRAINING_IMAGE_URI"
+```
+
+The command writes both `model_card.json` and `MODEL_CARD.md`. Deployment
+must use the card only when its status is `approved`; the card records the
+exact Git/DVC lineage, configurations, split hashes, MLflow run, Vertex job,
+hardware image, evaluation, and release artifact hashes. Automatic Vertex
+retraining publishes the same two files beside its release artifacts.
+
 ## 3.1 Inference runtime selection
 
 The inference image is separate from the training image and contains no

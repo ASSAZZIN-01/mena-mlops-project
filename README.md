@@ -219,6 +219,13 @@ feedback/drift gates or retraining watermarks. For automatic production
 retraining, the `mena_evidently_drift` DAG separately uses
 `scripts/submit_vertex_retraining.py`.
 
+After the manual evaluation and promotion decision, create the reproducibility
+identity bundle with `scripts/create_model_card.py`. It writes
+`model_card.json` and `MODEL_CARD.md` containing the MLflow run, Vertex job,
+Git/DVC lineage, exact configuration and split hashes, hardware image,
+evaluation, promotion gates, and ONNX artifact hashes. Automatic Vertex
+releases publish the same card files under their release prefix.
+
 Candidate promotion requires verified-label quality metrics:
 
 ```bash

@@ -52,6 +52,8 @@ def main() -> None:
         data_config = root / "data.yaml"
         _download(os.environ["VERTEX_TRAINING_CONFIG_URI"], training_config)
         _download(os.environ["VERTEX_DATA_CONFIG_URI"], data_config)
+        lineage_path = root / "lineage.json"
+        _download(os.environ["VERTEX_LINEAGE_URI"], lineage_path)
 
         config = load_yaml(training_config)
         config["paths"] = dict(config["paths"])
@@ -82,6 +84,7 @@ def main() -> None:
         run_id = run_training(training_config)
         _upload_tree(root / "model", f"{output_prefix}/model")
         _upload_tree(root / "reports", f"{output_prefix}/reports")
+        _upload_tree(root / "model", f"{output_prefix}/model-card-inputs")
         print(f"Manual Vertex MLflow run: {run_id}", flush=True)
         print(f"Manual Vertex artifacts: {output_prefix}", flush=True)
 

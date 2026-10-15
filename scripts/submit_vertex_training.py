@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
+import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +31,21 @@ def _upload(path: Path, uri: str) -> None:
     storage.Client().bucket(parsed.netloc).blob(
         parsed.path.lstrip("/")
     ).upload_from_filename(path)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _git_commit() -> str:
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
 
 
 def _submit_and_wait(spec: dict[str, object], project: str, region: str) -> str:
@@ -88,6 +106,23 @@ def main() -> None:
 
     _upload(args.config, f"{prefix}/training.yaml")
     _upload(args.data_config, f"{prefix}/data.yaml")
+    lineage = {
+        "git_commit": _git_commit(),
+        "dvc_commit": _git_commit(),
+        "dvc_lock_sha256": _sha256(Path("dvc.lock")),
+        "dvc_yaml_sha256": _sha256(Path("dvc.yaml")),
+        "training_config_sha256": _sha256(args.config),
+        "data_config_sha256": _sha256(args.data_config),
+        "training_image": image_uri,
+        "reproduction_command": (
+            f"python scripts/submit_vertex_training.py --config {args.config} "
+            f"--data-config {args.data_config} --data-dir {args.data_dir}"
+        ),
+    }
+    lineage_path = args.config.parent / ".vertex-lineage.json"
+    lineage_path.write_text(json.dumps(lineage, indent=2) + "\n", encoding="utf-8")
+    _upload(lineage_path, f"{prefix}/lineage.json")
+    lineage_path.unlink()
     for split in ("train", "validation", "test"):
         _upload(
             args.data_dir / f"{split}.parquet",
@@ -99,6 +134,9 @@ def main() -> None:
         {"name": "VERTEX_OUTPUT_PREFIX", "value": f"{prefix}/output"},
         {"name": "VERTEX_TRAINING_CONFIG_URI", "value": f"{prefix}/training.yaml"},
         {"name": "VERTEX_DATA_CONFIG_URI", "value": f"{prefix}/data.yaml"},
+        {"name": "VERTEX_LINEAGE_URI", "value": f"{prefix}/lineage.json"},
+        {"name": "VERTEX_MODEL_ID", "value": job_id},
+        {"name": "VERTEX_TRAINING_JOB_ID", "value": job_id},
     ]
     for name, value in (
         ("MLFLOW_TRACKING_URI", tracking_uri),
