@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mkdir -p /opt/airflow-db
+chown -R airflow:root /opt/airflow-db
 chown airflow:root /opt/airflow
 mkdir -p /opt/airflow/logs /opt/airflow/plugins
 find /opt/airflow -mindepth 1 -path /opt/airflow/dags -prune -o \

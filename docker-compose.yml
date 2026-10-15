@@ -134,6 +134,7 @@ services:
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow-db/airflow.db
       MENA_DRIFT_SCHEDULE: "${MENA_DRIFT_SCHEDULE:-*/10 * * * *}"
       _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USERNAME:-admin}
       _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
@@ -148,6 +149,7 @@ services:
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-key.json
     volumes:
       - airflow-home:/opt/airflow
+      - ./data/airflow:/opt/airflow-db
       - ./dags:/opt/airflow/dags:ro
       - ./src:/opt/mena-mlops-project/src:ro
       - ./scripts:/opt/mena-mlops-project/scripts:ro
