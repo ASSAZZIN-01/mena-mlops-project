@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p /opt/airflow/logs /opt/airflow/plugins
 chown airflow:root /opt/airflow
-if [[ -f /opt/airflow/airflow.db ]]; then
-    chown airflow:root /opt/airflow/airflow.db
-fi
-chown -R airflow:root /opt/airflow/logs /opt/airflow/plugins
+mkdir -p /opt/airflow/logs /opt/airflow/plugins
+find /opt/airflow -mindepth 1 -path /opt/airflow/dags -prune -o \
+    -exec chown airflow:root {} +
 mkdir -p /opt/mena-mlops-project/reports/drift
 chown -R airflow:root /opt/mena-mlops-project/reports/drift
 mkdir -p /opt/mena-mlops-project/data/feedback
