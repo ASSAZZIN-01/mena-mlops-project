@@ -28,9 +28,23 @@ def main() -> None:
         for label, value in config["retraining_thresholds"].items()
     }
     store = FeedbackStore(args.database)
-    counts = store.counts()
-    ready = store.thresholds_reached(thresholds)
-    print(json.dumps({"ready": ready, "counts": counts, "thresholds": thresholds}))
+    checkpoint = store.retraining_checkpoint()
+    counts = store.counts_since(checkpoint.last_feedback_id)
+    ready = all(
+        counts.get(label, 0) >= required
+        for label, required in thresholds.items()
+    )
+    print(
+        json.dumps(
+            {
+                "ready": ready,
+                "counts": counts,
+                "total_counts": store.counts(),
+                "thresholds": thresholds,
+                "last_feedback_id": checkpoint.last_feedback_id,
+            }
+        )
+    )
     raise SystemExit(0 if ready else 1)
 
 

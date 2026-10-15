@@ -15,6 +15,7 @@ from pendulum import datetime
     schedule=os.getenv("MENA_DRIFT_SCHEDULE", "*/10 * * * *"),
     start_date=datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
+    max_active_runs=1,
     tags=["monitoring", "evidently"],
 )
 def evidently_drift() -> None:
