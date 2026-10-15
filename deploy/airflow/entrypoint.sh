@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+chown -R airflow:root /opt/airflow
 mkdir -p /opt/mena-mlops-project/reports/drift
 chown -R airflow:root /opt/mena-mlops-project/reports/drift
 mkdir -p /opt/mena-mlops-project/data/feedback
