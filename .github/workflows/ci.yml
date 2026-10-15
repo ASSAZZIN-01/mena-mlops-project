@@ -126,7 +126,7 @@ jobs:
         run: python scripts/download_model_bundle.py
       - name: Prepare writable runtime data directories
         run: |
-          mkdir -p data/airflow data/audit data/feedback reports
+          mkdir -p data/audit data/feedback reports
           chmod -R a+rwX data reports
       - name: Start Compose stack
         run: docker compose up --build -d

@@ -12,7 +12,8 @@ RUN pip install --no-cache-dir \
     "evidently>=0.7" \
     "pandas>=2.2" \
     "google-auth>=2.35" \
-    "google-cloud-storage>=2.18"
+    "google-cloud-storage>=2.18" \
+    "apache-airflow-providers-postgres>=5.14"
 
 ENV PYTHONPATH=/opt/mena-mlops-project/src
 
