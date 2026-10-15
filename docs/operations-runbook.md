@@ -86,29 +86,20 @@ The run logs parameters, metrics, reports, and the model to the centralized
 MLflow server. Verify the run in the MLflow UI and verify that its model
 artifacts exist below `gs://mena-mlops-project-dvc/mlflow`.
 
-The feedback gate belongs to production retraining instead:
+For an on-demand full-data Vertex experiment, bypass the automatic trigger
+gate explicitly:
 
 ```bash
-uv run python scripts/check_retraining_gate.py
-uv run python scripts/run_retraining.py \
-  --database data/feedback/reviewed.db
+uv run python scripts/submit_vertex_retraining.py \
+  --manual \
+  --job-prefix manual-training
 ```
 
-The compatibility command delegates to the authenticated Vertex GPU
-submission path and does not train locally. For local verification, the
-feedback thresholds are intentionally reduced to
-5 negative, 1 neutral, and 5 positive examples. Restore the production
-thresholds in `configs/feedback.yaml` after the demonstration.
-
-The normal full-data training path is the `mena_scheduled_training` Airflow
-DAG, scheduled for 03:00 in `MENA_TRAINING_TIMEZONE` (UTC by default). Its
-task log starts with `03:00 <timezone> scheduled training` and includes the
-Vertex job ID, state polling, release decision, and final task result. Trigger
-it manually for a controlled verification:
-
-```bash
-airflow dags trigger mena_scheduled_training
-```
+This always submits a Vertex T4 job and never trains on the local GPU. The
+automatic `mena_evidently_drift` DAG remains responsible for production
+retraining when PSI/Evidently drift or reviewed-feedback thresholds trigger.
+Automatic runs advance the feedback watermark only after successful training;
+manual experiments leave it unchanged.
 
 ## 3.1 Inference runtime selection
 

@@ -93,9 +93,9 @@ def main() -> None:
     )
     parser.add_argument("--data-dir", type=Path, default=Path("data/processed"))
     parser.add_argument(
-        "--scheduled",
+        "--manual",
         action="store_true",
-        help="Submit the scheduled full-data training job without trigger gating.",
+        help="Submit an on-demand full-data Vertex job without trigger gating.",
     )
     parser.add_argument(
         "--job-prefix",
@@ -124,7 +124,7 @@ def main() -> None:
         drift_triggered(drift_summary)
         and current_drift_fingerprint != checkpoint.last_drift_fingerprint
     )
-    if not args.scheduled and not (feedback_ready or drift_ready):
+    if not args.manual and not (feedback_ready or drift_ready):
         print(
             json.dumps(
                 {
@@ -203,17 +203,18 @@ def main() -> None:
                 "job_id": job_id,
                 "feedback_triggered": feedback_ready,
                 "drift_triggered": drift_ready,
-                "scheduled": args.scheduled,
+                "manual": args.manual,
             }
         )
     )
     _submit_and_wait(job_spec, project, region)
-    store.mark_retraining_succeeded(
-        feedback_upper_bound,
-        current_drift_fingerprint
-        if drift_ready
-        else checkpoint.last_drift_fingerprint,
-    )
+    if not args.manual:
+        store.mark_retraining_succeeded(
+            feedback_upper_bound,
+            current_drift_fingerprint
+            if drift_ready
+            else checkpoint.last_drift_fingerprint,
+        )
 
 
 class tempfile_feedback:

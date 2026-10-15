@@ -205,25 +205,21 @@ reviewed-feedback class thresholds are reached. This prevents drift from being
 ignored while waiting for human labels, and also supports feedback-driven
 retraining when the data distribution is stable.
 
-When the feedback thresholds are reached, submit a candidate retraining job
-to Vertex:
+For an on-demand experiment, submit a full-data training job to the Vertex T4
+worker without using the feedback or drift gate:
 
 ```bash
-uv run python scripts/run_retraining.py \
-  --database data/feedback/reviewed.db
+uv run python scripts/submit_vertex_retraining.py \
+  --manual \
+  --job-prefix manual-training
 ```
 
-There is no local production retraining path. The compatibility command above
-delegates to `scripts/submit_vertex_retraining.py`, which submits a Vertex GPU
-Custom Job and waits for its terminal state. In the Airflow deployment, the
-`mena_evidently_drift` DAG evaluates feedback and drift triggers, while the
-`mena_scheduled_training` DAG submits the normal full-data Vertex job at
-03:00 in `MENA_TRAINING_TIMEZONE` (UTC by default). A drift-only trigger is
-valid and does not require the feedback thresholds to be met. Reviewed
-feedback is preserved, while a database watermark ensures that only new
-reviewed rows are used by trigger-based retraining. The watermark advances
-only after successful training, so failed jobs can retry safely without
-losing feedback.
+This is an on-demand Vertex GPU Custom Job and does not train on the local
+machine. For automatic production retraining, the `mena_evidently_drift` DAG
+submits the same Vertex path when either the Evidently/PSI drift trigger or
+the reviewed-feedback thresholds are reached. Automatic runs advance the
+feedback watermark only after successful training; manual experiments do not
+consume that watermark.
 
 Candidate promotion requires verified-label quality metrics:
 

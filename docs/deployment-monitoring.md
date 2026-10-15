@@ -261,9 +261,9 @@ When the feedback thresholds are reached, launch candidate retraining manually
 outside Airflow:
 
 ```bash
-uv run python scripts/run_retraining.py \
-  --database data/feedback/reviewed.db \
-  --output-dir models/arabert-candidate
+uv run python scripts/submit_vertex_retraining.py \
+  --manual \
+  --job-prefix manual-training
 ```
 
 After evaluating the stable and candidate reports on trusted labels, promote
