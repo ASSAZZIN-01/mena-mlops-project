@@ -25,8 +25,11 @@ flowchart LR
     Q --> G
     G -->|yes| V[Vertex GPU retraining]
     G -->|no| X[Skip retraining]
-    V --> QG[Verified-label quality gate]
-    QG --> N
+    V --> E[Held-out test evaluation]
+    E --> O[ONNX FP32 and INT8 optimization]
+    O --> QG[Quality and optimization gates]
+    QG -->|approved artifact| N
+    QG -->|rejected| X
 ```
 
 The same model artifact supports online HTTP inference, batch inference, and

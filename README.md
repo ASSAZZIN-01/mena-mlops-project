@@ -230,6 +230,18 @@ uv run python scripts/promote_candidate.py \
   --candidate reports/quality/candidate.json
 ```
 
+Automatic Vertex retraining performs the same release checks before the
+retraining watermark is advanced: it evaluates the held-out test set,
+exports ONNX FP32 and dynamic-INT8 variants, benchmarks their latency, selects
+the fastest variant within the configured quality-loss limit, and compares its
+test metrics with the stable baseline. The Vertex job publishes the variants,
+manifest, and `promotion_decision.json` below its staging prefix. A candidate
+is marked `approved` only when both the optimization gate and the verified
+label quality gate pass; otherwise it is marked `rejected` and is not
+production-ready. The local Nginx canary remains an explicit deployment
+operation so a rejected or unhealthy candidate cannot change production
+traffic automatically.
+
 ## CPU optimization
 
 ### Reviewer model bootstrap

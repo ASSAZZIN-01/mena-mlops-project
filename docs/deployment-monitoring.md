@@ -138,8 +138,19 @@ diagnosis. The model registry alias and router configuration must change
 together; a version number embedded in application code is not a rollback
 mechanism.
 
-No production promotion is enabled by this branch yet. Promotion remains gated
-until health, prediction, version, and monitoring contracts are validated.
+Vertex retraining now performs the release decision before a retraining
+watermark is committed. It evaluates the held-out test set, exports ONNX FP32
+and dynamic-INT8 artifacts, benchmarks both optimized variants against the
+PyTorch candidate, and selects the fastest variant that stays within the
+configured macro-F1 loss limit. The selected variant is then checked against
+the stable test macro-F1 and per-class floors in `configs/promotion.yaml`.
+The job publishes the variants, checksums, and `promotion_decision.json` below
+its Vertex staging prefix. Only an `approved` decision is production-ready.
+
+The local Nginx canary remains an explicit deployment operation rather than an
+implicit side effect of retraining. This keeps a rejected candidate from
+changing production traffic and allows health, prediction-version, error-rate,
+and latency checks before increasing the canary percentage.
 
 ## Evidently drift reports
 
