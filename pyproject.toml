@@ -15,6 +15,7 @@ dependencies = [
     "kaggle>=1.6",
     "mlflow==3.16.1",
     "numpy>=1.26",
+    "onnx>=1.16",
     "onnxruntime>=1.18",
     "pandas>=2.2",
     "prometheus-client>=0.26.0",
@@ -34,7 +35,6 @@ dev = [
     "dvc[gs]>=3.0",
     "httpx>=0.28.1",
     "locust>=2.45",
-    "onnx>=1.16",
     "pytest>=8.0",
     "ruff>=0.6",
 ]
