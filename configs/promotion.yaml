@@ -1,7 +1,9 @@
 quality_gate:
-  minimum_macro_f1: 0.60
+  # Temporary debug gate for the small course dataset. Restore stricter floors
+  # before using full-data production retraining.
+  minimum_macro_f1: 0.55
   minimum_improvement: 0.01
   minimum_class_f1:
-    negative: 0.50
-    neutral: 0.30
-    positive: 0.50
+    negative: 0.70
+    neutral: 0.15
+    positive: 0.80

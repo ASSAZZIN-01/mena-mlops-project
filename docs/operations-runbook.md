@@ -139,8 +139,11 @@ uv run python scripts/deploy_approved_candidate.py \
 ```
 
 The command refuses rejected decisions and never changes the stable model
-directory. Use the existing canary controls to increase traffic gradually or
-roll back.
+directory. By default it automatically progresses through 5%, 20%, 50%, and
+100% candidate traffic, observing each stage for ten minutes and rolling back
+to 100% stable on a failed health, error-rate, p95-latency, or prediction
+contract check. Use `--manual-canary` to stop at 5% and control the split
+manually.
 
 Point the candidate slot at a distinct immutable artifact:
 

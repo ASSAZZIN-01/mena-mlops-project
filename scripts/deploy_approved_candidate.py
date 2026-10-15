@@ -74,10 +74,14 @@ def main() -> None:
     )
     parser.add_argument("--candidate-percent", type=int, default=5)
     parser.add_argument("--skip-compose", action="store_true")
+    parser.add_argument("--manual-canary", action="store_true")
+    parser.add_argument("--stage-duration-seconds", type=int, default=600)
     args = parser.parse_args()
 
     if not 1 <= args.candidate_percent <= 99:
         parser.error("--candidate-percent must be between 1 and 99")
+    if args.stage_duration_seconds < 0:
+        parser.error("--stage-duration-seconds must be non-negative")
     decision = _read_decision(args.decision)
     if decision.get("status") != "approved":
         raise SystemExit("Refusing deployment: release decision is not approved.")
@@ -128,6 +132,19 @@ def main() -> None:
             env=environment,
         )
         print("Candidate service and Nginx canary started.")
+        if not args.manual_canary:
+            subprocess.run(
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "scripts/auto_canary.py",
+                    "--duration-seconds",
+                    str(args.stage_duration_seconds),
+                ],
+                check=True,
+                env=environment,
+            )
     else:
         print("Compose start skipped; use the printed environment values to deploy.")
 
