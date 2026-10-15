@@ -230,6 +230,14 @@ worker, downloads the staged data, runs `scripts/vertex_train.py`, and
 terminates after training. The training container logs the run through the
 cloud-reachable `MLFLOW_TRACKING_URI` and configured GCS artifact location.
 
+Reviewed feedback is not deleted after retraining. The feedback database stores
+a durable checkpoint containing the highest reviewed feedback ID included in
+the last successful run. Thresholds and exports use only newer reviewed rows,
+and the checkpoint advances only after Vertex reaches `JOB_STATE_SUCCEEDED`.
+If training fails, the same feedback remains eligible for the next retry.
+Airflow also limits the DAG to one active run so overlapping schedules cannot
+submit the same batch concurrently.
+
 The local MLflow URL (`http://localhost:5000`) cannot be used directly by a
 Vertex worker. To follow the same cloud MLflow server locally, expose it
 through an SSH tunnel or another secure port-forward to local port 5000.

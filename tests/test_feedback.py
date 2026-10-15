@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from mena_mlops.feedback import FeedbackStore
@@ -33,3 +34,45 @@ def test_deferred_feedback_is_not_validated_or_pending(tmp_path: Path) -> None:
 
     assert store.next_pending() is None
     assert store.counts() == {"negative": 0, "neutral": 0, "positive": 0}
+
+
+def _review(store: FeedbackStore, label: str) -> int:
+    item_id = store.add_uncertain("نص للمراجعة", "neutral", 0.5)
+    store.review(item_id, correct=False, corrected_label=label)
+    return item_id
+
+
+def test_retraining_checkpoint_consumes_a_batch_without_deleting_history(
+    tmp_path: Path,
+) -> None:
+    store = FeedbackStore(tmp_path / "feedback.db")
+    first_id = _review(store, "negative")
+    _review(store, "positive")
+    upper_bound = store.latest_reviewed_id()
+
+    assert store.counts_since(0) == {"negative": 1, "neutral": 0, "positive": 1}
+    export_path = tmp_path / "batch.parquet"
+    assert store.export_reviewed(export_path, after_id=0, through_id=upper_bound) == 2
+    assert set(pd.read_parquet(export_path)["id"]) == {first_id, upper_bound}
+
+    store.mark_retraining_succeeded(upper_bound, "drift-a")
+
+    checkpoint = store.retraining_checkpoint()
+    assert checkpoint.last_feedback_id == upper_bound
+    assert checkpoint.last_drift_fingerprint == "drift-a"
+    assert store.counts_since(checkpoint.last_feedback_id) == {
+        "negative": 0,
+        "neutral": 0,
+        "positive": 0,
+    }
+    assert store.counts() == {"negative": 1, "neutral": 0, "positive": 1}
+
+
+def test_failed_retraining_does_not_advance_checkpoint(tmp_path: Path) -> None:
+    store = FeedbackStore(tmp_path / "feedback.db")
+    reviewed_id = _review(store, "positive")
+
+    checkpoint = store.retraining_checkpoint()
+    assert checkpoint.last_feedback_id == 0
+    assert store.counts_since(checkpoint.last_feedback_id)["positive"] == 1
+    assert store.latest_reviewed_id() == reviewed_id

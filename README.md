@@ -217,7 +217,10 @@ In the Airflow deployment, the `mena_evidently_drift` DAG runs the drift
 report and then evaluates both triggers before calling
 `scripts/submit_vertex_retraining.py`. The Vertex job uses the processed
 training data plus any reviewed feedback. A drift-only trigger is valid and
-does not require the feedback thresholds to be met.
+does not require the feedback thresholds to be met. Reviewed feedback is
+preserved, while a database watermark ensures that only new reviewed rows are
+used for subsequent retraining. The watermark advances only after successful
+training, so failed jobs can retry safely without losing feedback.
 
 Candidate promotion requires verified-label quality metrics:
 
@@ -249,10 +252,11 @@ generated when absent, and `source` defaults to empty when absent. Load
 testing remains a controlled Locust command rather than a web-triggered
 operation.
 
-Grafana, Prometheus, MLflow, and Airflow are included in the local Compose stack.
+Grafana, Prometheus, MLflow, PostgreSQL, and Airflow are included in the local Compose stack.
 MLflow uses a persistent Compose volume for its tracking metadata and the
 configured GCS bucket for artifacts.
-Airflow uses a persistent Compose home volume and is available at
+Airflow stores its metadata in the persistent PostgreSQL Compose service and
+is available at
 [`http://localhost:8081`](http://localhost:8081), with the default credentials
 from `.env.example` unless overridden.
 

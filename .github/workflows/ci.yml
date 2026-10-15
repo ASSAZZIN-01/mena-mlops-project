@@ -141,7 +141,7 @@ jobs:
             "airflow|http://localhost:8081/health"
             "prometheus|http://localhost:9090/-/ready"
           )
-          for attempt in {1..60}; do
+          for attempt in {1..30}; do
             ready=true
             for endpoint in "${endpoints[@]}"; do
               name="${endpoint%%|*}"
