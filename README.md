@@ -270,6 +270,11 @@ prediction contract fails. Use `--manual-canary` to keep the candidate at 5%
 and control traffic manually; roll back with
 `uv run python scripts/canary.py --rollback`.
 
+Deployment also validates the approved `model-card/model_card.json` and writes
+`deployment_identity.json` into the candidate directory. That file links the
+running candidate to the model ID, model-card URI and SHA-256, release URI,
+promotion decision, selected variant, and deployment stage.
+
 ## CPU optimization
 
 Inference containers do not install PyTorch. Stable, candidate, and stream

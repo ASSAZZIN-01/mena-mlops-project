@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 from google.cloud import storage
 
+from mena_mlops.deployment_identity import build_deployment_identity
 from mena_mlops.observability import emit_event
 
 
@@ -45,16 +46,21 @@ def _download_bundle(source: str, destination: Path) -> None:
             raise FileNotFoundError(f"no release files found below {source}")
         for blob in blobs:
             relative = blob.name[len(prefix) :]
-            if relative and "/" not in relative:
-                blob.download_to_filename(destination / relative)
+            if relative:
+                target = destination / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                blob.download_to_filename(target)
         return
 
     source_path = Path(source)
     if not source_path.is_dir():
         raise FileNotFoundError(f"local bundle directory does not exist: {source}")
     for item in source_path.iterdir():
-        if item.is_file():
-            shutil.copy2(item, destination / item.name)
+        target = destination / item.name
+        if item.is_dir():
+            shutil.copytree(item, target, dirs_exist_ok=True)
+        elif item.is_file():
+            shutil.copy2(item, target)
 
 
 def main() -> None:
@@ -109,6 +115,17 @@ def main() -> None:
     missing = [name for name in required if not (args.output_dir / name).is_file()]
     if missing:
         raise RuntimeError(f"release bundle is missing: {', '.join(missing)}")
+    identity = build_deployment_identity(
+        decision=decision,
+        decision_uri=args.decision,
+        bundle=bundle,
+        output_dir=args.output_dir,
+        selected_variant=str(selected_variant),
+    )
+    (args.output_dir / "deployment_identity.json").write_text(
+        json.dumps(identity, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
     stable_percent = 100 - args.candidate_percent
     emit_event(
@@ -119,6 +136,8 @@ def main() -> None:
         output_dir=str(args.output_dir),
         selected_variant=selected_variant,
         model_file=model_file,
+        model_id=identity["model_id"],
+        model_card_sha256=identity["model_card_sha256"],
     )
     emit_event(
         "deployment_canary_started",
@@ -134,7 +153,7 @@ def main() -> None:
                 "CANDIDATE_MODEL_BACKEND": "onnx",
                 "CANDIDATE_MODEL_PATH": str(args.output_dir.resolve()),
                 "CANDIDATE_MODEL_FILE": model_file,
-                "CANDIDATE_MODEL_VERSION": args.output_dir.name,
+                "CANDIDATE_MODEL_VERSION": str(identity["model_id"]),
                 "STABLE_WEIGHT": str(stable_percent),
                 "CANDIDATE_WEIGHT": str(args.candidate_percent),
             }
