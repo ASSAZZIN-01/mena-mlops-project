@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import random
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -87,6 +88,8 @@ def run_epoch(
     device: torch.device,
     optimizer: Any | None,
     accumulation_steps: int,
+    use_amp: bool = False,
+    scaler: Any | None = None,
 ) -> tuple[float, list[int], list[int]]:
     training = optimizer is not None
     model.train(training)
@@ -97,14 +100,27 @@ def run_epoch(
         optimizer.zero_grad()
     for step, batch in enumerate(loader):
         batch = {key: value.to(device) for key, value in batch.items()}
-        with torch.set_grad_enabled(training):
+        autocast_context = (
+            torch.autocast(device_type="cuda", dtype=torch.float16)
+            if use_amp
+            else nullcontext()
+        )
+        with torch.set_grad_enabled(training), autocast_context:
             output = model(**batch)
             loss = output.loss
-            if training:
-                (loss / accumulation_steps).backward()
-                if (step + 1) % accumulation_steps == 0 or step + 1 == len(loader):
+        if training:
+            scaled_loss = loss / accumulation_steps
+            if scaler is not None:
+                scaler.scale(scaled_loss).backward()
+            else:
+                scaled_loss.backward()
+            if (step + 1) % accumulation_steps == 0 or step + 1 == len(loader):
+                if scaler is not None:
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
                     optimizer.step()
-                    optimizer.zero_grad()
+                optimizer.zero_grad()
         total_loss += float(loss.detach().cpu())
         predictions.extend(output.logits.argmax(dim=-1).detach().cpu().tolist())
         labels.extend(batch["labels"].detach().cpu().tolist())
@@ -212,6 +228,8 @@ def run_training(config_path: Path) -> str:
         lr=float(train_config["learning_rate"]),
         weight_decay=float(train_config["weight_decay"]),
     )
+    use_amp = bool(train_config.get("fp16", False)) and device.type == "cuda"
+    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
     tracking_uri = os.getenv(
         "MLFLOW_TRACKING_URI",
         str(config["mlflow"]["tracking_uri"]),
@@ -245,6 +263,7 @@ def run_training(config_path: Path) -> str:
                 "seed": config["seed"],
                 "device": str(device),
                 "cuda_available": torch.cuda.is_available(),
+                "mixed_precision": use_amp,
                 "data_mode": data_config["split"]["debug"],
                 "oversampling_enabled": bool(oversampling.get("enabled", False)),
             }
@@ -271,9 +290,11 @@ def run_training(config_path: Path) -> str:
                 device,
                 optimizer,
                 int(train_config["gradient_accumulation_steps"]),
+                use_amp,
+                scaler,
             )
             validation_loss, validation_predictions, validation_labels = run_epoch(
-                model, loaders["validation"], device, None, 1
+                model, loaders["validation"], device, None, 1, use_amp
             )
             validation = evaluate_predictions(
                 validation_labels, validation_predictions, label_names
@@ -298,7 +319,7 @@ def run_training(config_path: Path) -> str:
         reports = {}
         for split in ["validation", "test"]:
             _, predictions, labels = run_epoch(
-                model, loaders[split], device, None, 1
+                model, loaders[split], device, None, 1, use_amp
             )
             metrics = evaluate_predictions(labels, predictions, label_names)
             reports[split] = metrics
@@ -320,6 +341,11 @@ def run_training(config_path: Path) -> str:
             encoding="utf-8",
         )
         mlflow.log_artifact(str(report_path), artifact_path="reports")
+        if device.type == "cuda":
+            mlflow.log_metric(
+                "peak_cuda_memory_mb",
+                torch.cuda.max_memory_allocated(device) / (1024 * 1024),
+            )
         mlflow.log_artifacts(str(output_dir), artifact_path="model")
         mlflow.transformers.log_model(
             transformers_model={"model": model, "tokenizer": tokenizer},

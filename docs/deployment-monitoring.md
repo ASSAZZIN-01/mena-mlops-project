@@ -261,8 +261,7 @@ When the feedback thresholds are reached, launch candidate retraining manually
 outside Airflow:
 
 ```bash
-uv run python scripts/submit_vertex_retraining.py \
-  --manual \
+uv run python scripts/submit_vertex_training.py \
   --job-prefix manual-training
 ```
 

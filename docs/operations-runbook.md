@@ -90,16 +90,15 @@ For an on-demand full-data Vertex experiment, bypass the automatic trigger
 gate explicitly:
 
 ```bash
-uv run python scripts/submit_vertex_retraining.py \
-  --manual \
+uv run python scripts/submit_vertex_training.py \
   --job-prefix manual-training
 ```
 
 This always submits a Vertex T4 job and never trains on the local GPU. The
 automatic `mena_evidently_drift` DAG remains responsible for production
 retraining when PSI/Evidently drift or reviewed-feedback thresholds trigger.
-Automatic runs advance the feedback watermark only after successful training;
-manual experiments leave it unchanged.
+The manual command uses the selected training YAML unchanged, while the
+automatic retraining path has its own trigger, release, and watermark logic.
 
 ## 3.1 Inference runtime selection
 

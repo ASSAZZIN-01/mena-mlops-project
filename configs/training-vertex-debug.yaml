@@ -1,0 +1,31 @@
+seed: 42
+
+model:
+  name: aubmindlab/bert-base-arabertv2
+  num_labels: 3
+
+training:
+  max_length: 384
+  batch_size: 64
+  eval_batch_size: 128
+  gradient_accumulation_steps: 1
+  epochs: 2
+  learning_rate: 0.00002
+  weight_decay: 0.01
+  device: cuda
+  fp16: true
+  oversampling:
+    enabled: true
+
+mlflow:
+  experiment_name: mena-mlops-arabert-gcs
+  tracking_uri: http://localhost:5000
+  artifact_location: gs://mena-mlops-project-dvc/mlflow
+  run_name: arabert-vertex-debug
+  registered_model_name: mena-mlops-arabert
+
+paths:
+  data_config: configs/data-vertex-debug.yaml
+  data_dir: data/processed-vertex-debug
+  output_dir: models/arabert-vertex-debug
+  report_dir: reports/training/vertex-debug
