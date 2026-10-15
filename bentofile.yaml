@@ -3,8 +3,10 @@ include:
   - "src/mena_mlops/**"
 python:
   packages:
-    - "torch==2.5.1"
+    - "numpy>=1.26"
+    - "onnxruntime>=1.18"
     - "transformers>=4.45"
+    - "prometheus-client>=0.26.0"
     - "pydantic>=2"
 docker:
   python_version: "3.13"

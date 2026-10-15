@@ -1,13 +1,18 @@
 services:
   model-stable:
-    build: .
+    build:
+      context: .
+      dockerfile: deploy/inference/Dockerfile
+      args:
+        ONNXRUNTIME_PACKAGE: ${ONNXRUNTIME_PACKAGE:-onnxruntime}
     environment:
       MODEL_BACKEND: ${STABLE_MODEL_BACKEND:-onnx}
       MODEL_PATH: /models/stable
       MODEL_ONNX_PATH: /models/stable/model-int8.onnx
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
-      MODEL_DEVICE: cpu
+      MODEL_DEVICE: ${INFERENCE_DEVICE:-cpu}
+      ONNX_PROVIDERS: ${ONNX_PROVIDERS:-}
       AUDIT_DB: /data/audit/predictions.db
       FEEDBACK_DB: /data/feedback/reviewed.db
     volumes:
@@ -29,14 +34,19 @@ services:
       retries: 12
 
   model-candidate:
-    build: .
+    build:
+      context: .
+      dockerfile: deploy/inference/Dockerfile
+      args:
+        ONNXRUNTIME_PACKAGE: ${ONNXRUNTIME_PACKAGE:-onnxruntime}
     environment:
       MODEL_BACKEND: ${CANDIDATE_MODEL_BACKEND:-onnx}
       MODEL_PATH: /models/candidate
       MODEL_ONNX_PATH: /models/candidate/${CANDIDATE_MODEL_FILE:-model-int8.onnx}
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${CANDIDATE_MODEL_VERSION:-candidate-v1}
-      MODEL_DEVICE: cpu
+      MODEL_DEVICE: ${INFERENCE_DEVICE:-cpu}
+      ONNX_PROVIDERS: ${ONNX_PROVIDERS:-}
       AUDIT_DB: /data/audit/predictions.db
       FEEDBACK_DB: /data/feedback/reviewed.db
     volumes:
@@ -150,6 +160,8 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
         postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres-airflow:5432/${AIRFLOW_DB_NAME:-airflow}
       MENA_DRIFT_SCHEDULE: "${MENA_DRIFT_SCHEDULE:-*/10 * * * *}"
+      MENA_TRAINING_SCHEDULE: "${MENA_TRAINING_SCHEDULE:-0 3 * * *}"
+      MENA_TRAINING_TIMEZONE: "${MENA_TRAINING_TIMEZONE:-UTC}"
       _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USERNAME:-admin}
       _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
       VERTEX_PROJECT_ID: ${VERTEX_PROJECT_ID:-}
@@ -204,7 +216,11 @@ services:
       - --server.port=8501
 
   feedback-consumer:
-    build: .
+    build:
+      context: .
+      dockerfile: deploy/inference/Dockerfile
+      args:
+        ONNXRUNTIME_PACKAGE: ${ONNXRUNTIME_PACKAGE:-onnxruntime}
     depends_on:
       model-stable:
         condition: service_healthy
@@ -216,7 +232,8 @@ services:
       MODEL_ONNX_PATH: /models/stable/model-int8.onnx
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
-      MODEL_DEVICE: cpu
+      MODEL_DEVICE: ${INFERENCE_DEVICE:-cpu}
+      ONNX_PROVIDERS: ${ONNX_PROVIDERS:-}
       REDIS_URL: redis://redis:6379/0
       AUDIT_DB: /data/audit/predictions.db
       FEEDBACK_DB: /data/feedback/reviewed.db
@@ -228,9 +245,6 @@ services:
       - ./data/feedback:/data/feedback
       - ./data/audit:/data/audit
     command:
-      - uv
-      - run
-      - --no-sync
       - python
       - scripts/run_stream_consumer.py
     restart: unless-stopped

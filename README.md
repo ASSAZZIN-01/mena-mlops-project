@@ -205,22 +205,25 @@ reviewed-feedback class thresholds are reached. This prevents drift from being
 ignored while waiting for human labels, and also supports feedback-driven
 retraining when the data distribution is stable.
 
-When the feedback thresholds are reached, retrain a candidate manually:
+When the feedback thresholds are reached, submit a candidate retraining job
+to Vertex:
 
 ```bash
 uv run python scripts/run_retraining.py \
-  --database data/feedback/reviewed.db \
-  --output-dir models/arabert-candidate
+  --database data/feedback/reviewed.db
 ```
 
-In the Airflow deployment, the `mena_evidently_drift` DAG runs the drift
-report and then evaluates both triggers before calling
-`scripts/submit_vertex_retraining.py`. The Vertex job uses the processed
-training data plus any reviewed feedback. A drift-only trigger is valid and
-does not require the feedback thresholds to be met. Reviewed feedback is
-preserved, while a database watermark ensures that only new reviewed rows are
-used for subsequent retraining. The watermark advances only after successful
-training, so failed jobs can retry safely without losing feedback.
+There is no local production retraining path. The compatibility command above
+delegates to `scripts/submit_vertex_retraining.py`, which submits a Vertex GPU
+Custom Job and waits for its terminal state. In the Airflow deployment, the
+`mena_evidently_drift` DAG evaluates feedback and drift triggers, while the
+`mena_scheduled_training` DAG submits the normal full-data Vertex job at
+03:00 in `MENA_TRAINING_TIMEZONE` (UTC by default). A drift-only trigger is
+valid and does not require the feedback thresholds to be met. Reviewed
+feedback is preserved, while a database watermark ensures that only new
+reviewed rows are used by trigger-based retraining. The watermark advances
+only after successful training, so failed jobs can retry safely without
+losing feedback.
 
 Candidate promotion requires verified-label quality metrics:
 
@@ -267,6 +270,26 @@ and control traffic manually; roll back with
 `uv run python scripts/canary.py --rollback`.
 
 ## CPU optimization
+
+Inference containers do not install PyTorch. Stable, candidate, and stream
+consumer services load the published ONNX or INT8 ONNX artifact through a
+configurable ONNX Runtime package:
+
+```bash
+# CPU (default)
+ONNXRUNTIME_PACKAGE=onnxruntime INFERENCE_DEVICE=cpu docker compose up -d --build
+
+# GPU host with the matching CUDA runtime available
+ONNXRUNTIME_PACKAGE=onnxruntime-gpu \
+INFERENCE_DEVICE=cuda \
+ONNX_PROVIDERS=CUDAExecutionProvider,CPUExecutionProvider \
+docker compose up -d --build model-stable model-candidate
+```
+
+The service validates requested providers against the runtime's available
+providers and fails explicitly if a configured GPU provider is unavailable.
+The inference image never loads the trained PyTorch checkpoint; it uses only
+the promoted ONNX or INT8 ONNX deployment representation.
 
 ### Reviewer model bootstrap
 

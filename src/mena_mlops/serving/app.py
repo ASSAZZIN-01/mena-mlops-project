@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Protocol
 
 import numpy as np
-import torch
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
@@ -38,6 +37,26 @@ class HealthResponse(BaseModel):
     model_version: str
 
 
+def _select_onnx_providers(
+    available: set[str],
+    device: str,
+    configured: str | None,
+) -> list[str]:
+    if configured:
+        requested = [item.strip() for item in configured.split(",") if item.strip()]
+    elif device.lower() == "cuda":
+        requested = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    else:
+        requested = ["CPUExecutionProvider"]
+    selected = [provider for provider in requested if provider in available]
+    if not selected:
+        raise RuntimeError(
+            "none of the requested ONNX Runtime providers are available: "
+            f"requested={requested}, available={sorted(available)}"
+        )
+    return selected
+
+
 REQUESTS = Counter(
     "mena_model_requests_total",
     "Prediction requests handled by the model service.",
@@ -56,13 +75,16 @@ class TransformerPredictor:
 
     model_path: Path
     model_version: str
-    device: torch.device
+    device: str
 
     def __post_init__(self) -> None:
+        import torch
+
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_path
-        ).to(self.device)
+        ).to(torch.device(self.device))
+        self.device = torch.device(self.device)
         self.model.eval()
         raw_labels = self.model.config.id2label
         self.labels = {
@@ -78,6 +100,8 @@ class TransformerPredictor:
             max_length=int(os.getenv("MODEL_MAX_LENGTH", "128")),
         )
         encoded = {key: value.to(self.device) for key, value in encoded.items()}
+        import torch
+
         with torch.inference_mode():
             probabilities = torch.softmax(self.model(**encoded).logits[0], dim=-1)
         values = {
@@ -97,15 +121,20 @@ class OnnxPredictor:
     model_version: str
 
     def __post_init__(self) -> None:
-        from onnxruntime import InferenceSession
+        import onnxruntime
 
         from mena_mlops.optimization import onnx_predict
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_path)
-        self.session = InferenceSession(
-            str(self.model_path),
-            providers=["CPUExecutionProvider"],
+        selected = _select_onnx_providers(
+            set(onnxruntime.get_available_providers()),
+            os.getenv("MODEL_DEVICE", "cpu"),
+            os.getenv("ONNX_PROVIDERS"),
         )
+        self.session = onnxruntime.InferenceSession(
+            str(self.model_path), providers=selected
+        )
+        self.providers = tuple(self.session.get_providers())
         self._onnx_predict = onnx_predict
         raw_config = self.tokenizer.init_kwargs.get("model_max_length", 128)
         self.max_length = min(int(raw_config), 128)
@@ -118,10 +147,13 @@ class OnnxPredictor:
             text,
             max_length=self.max_length,
         )
-        probabilities = torch.softmax(torch.from_numpy(np.asarray(logits)), dim=-1)
+        values_array = np.asarray(logits, dtype=np.float64).reshape(-1)
+        shifted = values_array - np.max(values_array)
+        probabilities = np.exp(shifted)
+        probabilities /= np.sum(probabilities)
         values = {
             self.labels[index]: round(float(probability), 6)
-            for index, probability in enumerate(probabilities)
+            for index, probability in enumerate(probabilities.tolist())
         }
         return max(values, key=values.get), values
 
@@ -144,11 +176,11 @@ def _load_predictor() -> Predictor:
         )
     requested_device = os.getenv("MODEL_DEVICE", "auto")
     if requested_device == "auto":
-        requested_device = "cuda" if torch.cuda.is_available() else "cpu"
+        requested_device = "cpu"
     return TransformerPredictor(
         model_path=model_path,
         model_version=os.getenv("MODEL_VERSION", model_path.name),
-        device=torch.device(requested_device),
+        device=requested_device,
     )
 
 

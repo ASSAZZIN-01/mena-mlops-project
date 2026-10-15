@@ -1,4 +1,4 @@
-"""Submit and monitor a feedback-gated Vertex AI Custom Job."""
+"""Submit and monitor a Vertex AI Custom Job."""
 
 from __future__ import annotations
 
@@ -92,6 +92,16 @@ def main() -> None:
         help="Evidently/PSI summary used as an independent retraining trigger.",
     )
     parser.add_argument("--data-dir", type=Path, default=Path("data/processed"))
+    parser.add_argument(
+        "--scheduled",
+        action="store_true",
+        help="Submit the scheduled full-data training job without trigger gating.",
+    )
+    parser.add_argument(
+        "--job-prefix",
+        default="feedback-retraining",
+        help="Display-name prefix for the Vertex job.",
+    )
     args = parser.parse_args()
 
     config = yaml.safe_load(args.feedback_config.read_text(encoding="utf-8"))
@@ -114,7 +124,7 @@ def main() -> None:
         drift_triggered(drift_summary)
         and current_drift_fingerprint != checkpoint.last_drift_fingerprint
     )
-    if not (feedback_ready or drift_ready):
+    if not args.scheduled and not (feedback_ready or drift_ready):
         print(
             json.dumps(
                 {
@@ -133,7 +143,9 @@ def main() -> None:
     region = os.getenv("VERTEX_REGION", "us-central1")
     image_uri = os.environ["VERTEX_TRAINING_IMAGE_URI"]
     staging_bucket = os.environ["VERTEX_STAGING_BUCKET"].rstrip("/")
-    job_id = datetime.now(UTC).strftime("feedback-retraining-%Y%m%d-%H%M%S")
+    job_id = datetime.now(UTC).strftime(
+        f"{args.job_prefix}-%Y%m%d-%H%M%S"
+    )
     prefix = f"{staging_bucket}/{job_id}"
     with tempfile_feedback(
         args.database,
@@ -191,6 +203,7 @@ def main() -> None:
                 "job_id": job_id,
                 "feedback_triggered": feedback_ready,
                 "drift_triggered": drift_ready,
+                "scheduled": args.scheduled,
             }
         )
     )

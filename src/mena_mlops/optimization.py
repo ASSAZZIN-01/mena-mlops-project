@@ -6,14 +6,18 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from shutil import copy2
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import torch
+
+if TYPE_CHECKING:
+    import torch
 
 
-def quantize_linear_layers(model: torch.nn.Module) -> torch.nn.Module:
+def quantize_linear_layers(model: "torch.nn.Module") -> "torch.nn.Module":
     """Return a dynamically quantized CPU copy of a Transformer model."""
+
+    import torch
 
     if next(model.parameters()).device.type != "cpu":
         raise ValueError("dynamic quantization requires a CPU model")
@@ -50,13 +54,15 @@ def benchmark_callable(
 
 
 def export_onnx_model(
-    model: torch.nn.Module,
+    model: "torch.nn.Module",
     tokenizer: Any,
     output_path: Path,
     *,
     max_length: int = 128,
 ) -> None:
     """Export a sequence-classification model with dynamic batch axes."""
+
+    import torch
 
     encoded = tokenizer(
         "هذا المنتج ممتاز",
