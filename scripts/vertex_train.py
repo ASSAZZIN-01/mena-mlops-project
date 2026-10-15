@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -12,6 +13,7 @@ import torch
 import yaml
 from google.cloud import storage
 
+from mena_mlops.model_card import build_model_card, write_model_card
 from mena_mlops.promotion import evaluate_and_gate_candidate
 from mena_mlops.training.train import load_yaml, run_training
 
@@ -45,6 +47,17 @@ def main() -> None:
         data_dir.mkdir()
         for split in ("train", "validation", "test", "feedback"):
             _download(f"{input_prefix}/{split}.parquet", data_dir / f"{split}.parquet")
+        lineage_path = root / "lineage.json"
+        lineage_uri = os.environ.get("VERTEX_LINEAGE_URI")
+        if lineage_uri:
+            _download(lineage_uri, lineage_path)
+            lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+        else:
+            lineage = {
+                "training_image": os.environ.get(
+                    "VERTEX_TRAINING_IMAGE_URI", "unknown"
+                )
+            }
 
         train = pd.read_parquet(data_dir / "train.parquet")
         feedback = pd.read_parquet(data_dir / "feedback.parquet")
@@ -102,9 +115,28 @@ def main() -> None:
             ),
             max_length=int(config["training"]["max_length"]),
         )
+        card = build_model_card(
+            model_id=os.environ.get("VERTEX_MODEL_ID", input_prefix.rsplit("/", 1)[-1]),
+            training_job_id=os.environ.get("VERTEX_TRAINING_JOB_ID"),
+            mlflow_run_id=run_id,
+            config=config,
+            data_config=load_yaml(
+                Path(os.environ.get("DATA_CONFIG", "configs/data.yaml"))
+            ),
+            data_dir=data_dir,
+            model_dir=root / "model",
+            release_dir=root / "variants",
+            evaluation=json.loads(
+                (root / "reports" / "evaluation.json").read_text(encoding="utf-8")
+            ),
+            promotion_decision=decision,
+            lineage=lineage,
+        )
+        write_model_card(card, root / "model-card")
         release_prefix = f"{input_prefix}/release"
         _upload_directory(root / "variants", release_prefix)
         _upload_directory(root / "reports", release_prefix)
+        _upload_directory(root / "model-card", release_prefix)
         print(
             f"MLflow candidate run: {run_id}; "
             f"promotion status: {decision['status']}; "
