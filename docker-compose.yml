@@ -129,11 +129,16 @@ services:
     build:
       context: .
       dockerfile: deploy/airflow/Dockerfile
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
     ports:
       - "8081:8080"
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+        postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres-airflow:5432/${AIRFLOW_DB_NAME:-airflow}
       MENA_DRIFT_SCHEDULE: "${MENA_DRIFT_SCHEDULE:-*/10 * * * *}"
       _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USERNAME:-admin}
       _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
@@ -258,6 +263,23 @@ services:
       timeout: 3s
       retries: 12
 
+  postgres-airflow:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
+    volumes:
+      - airflow-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
 volumes:
   airflow-home:
+  airflow-postgres:
   mlflow-backend:
