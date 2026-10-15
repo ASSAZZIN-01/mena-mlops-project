@@ -15,6 +15,7 @@ from onnxruntime.quantization import QuantType, quantize_dynamic
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from mena_mlops.deployment.quality_gate import evaluate_quality_gate
+from mena_mlops.observability import emit_event
 from mena_mlops.optimization import benchmark_callable, export_onnx_model, onnx_predict
 from mena_mlops.quality import check_optimization_quality, select_optimization_variant
 from mena_mlops.training.evaluation import evaluate_predictions
@@ -253,5 +254,14 @@ def evaluate_and_gate_candidate(
     report_path.write_text(
         json.dumps(decision, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
+    )
+    emit_event(
+        "promotion_completed",
+        "promotion",
+        status=decision["status"],
+        selected_variant=selected,
+        report_path=str(report_path),
+        quality_gate=quality_accepted,
+        optimization_gate=selected is not None and not optimization_failures,
     )
     return decision

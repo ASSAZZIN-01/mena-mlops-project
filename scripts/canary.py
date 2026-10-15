@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from mena_mlops.deployment.canary import apply_split, split_for_candidate
+from mena_mlops.observability import emit_event
 
 
 def main() -> None:
@@ -25,7 +26,13 @@ def main() -> None:
     if candidate is None:
         parser.error("--candidate is required unless --rollback is used")
     split = split_for_candidate(candidate)
-    print(f"Applying stable={split.stable}% candidate={split.candidate}%")
+    emit_event(
+        "traffic_split_applied",
+        "canary",
+        status="completed",
+        stable_percent=split.stable,
+        candidate_percent=split.candidate,
+    )
     apply_split(split)
 
 

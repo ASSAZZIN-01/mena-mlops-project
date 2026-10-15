@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import yaml
 from google.cloud import storage
 
+from mena_mlops.observability import emit_event
 from mena_mlops.training.train import load_yaml, run_training
 
 
@@ -75,18 +76,25 @@ def main() -> None:
                 "CUDA was requested but is unavailable in the Vertex container: "
                 f"torch={torch.__version__}, cuda_build={torch.version.cuda}"
             )
-        print(
-            "Vertex manual-training GPU: "
-            f"{torch.cuda.get_device_name(0)} "
-            f"(torch={torch.__version__}, cuda_build={torch.version.cuda})",
-            flush=True,
+        emit_event(
+            "vertex_training_started",
+            "manual_training",
+            status="running",
+            accelerator=torch.cuda.get_device_name(0),
+            torch_version=torch.__version__,
+            cuda_build=torch.version.cuda,
         )
         run_id = run_training(training_config)
         _upload_tree(root / "model", f"{output_prefix}/model")
         _upload_tree(root / "reports", f"{output_prefix}/reports")
         _upload_tree(root / "model", f"{output_prefix}/model-card-inputs")
-        print(f"Manual Vertex MLflow run: {run_id}", flush=True)
-        print(f"Manual Vertex artifacts: {output_prefix}", flush=True)
+        emit_event(
+            "vertex_training_completed",
+            "manual_training",
+            status="succeeded",
+            mlflow_run_id=run_id,
+            output_prefix=output_prefix,
+        )
 
 
 if __name__ == "__main__":

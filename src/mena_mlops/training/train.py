@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from mena_mlops.observability import emit_event
 from mena_mlops.training.data import (
     build_label_maps,
     encode_labels,
@@ -175,6 +176,13 @@ def log_dataset_inputs(
 def run_training(config_path: Path) -> str:
     load_dotenv()
     config = load_yaml(config_path)
+    emit_event(
+        "training_started",
+        "training",
+        status="started",
+        config_path=str(config_path),
+        model_name=config["model"]["name"],
+    )
     data_config = load_yaml(Path(config["paths"]["data_config"]))
     set_seed(int(config["seed"]))
     device = select_device(config)
@@ -358,6 +366,13 @@ def run_training(config_path: Path) -> str:
                 "safetensors>=0.4",
             ],
         )
+        emit_event(
+            "training_completed",
+            "training",
+            status="succeeded",
+            mlflow_run_id=run.info.run_id,
+            test_macro_f1=reports["test"]["macro_f1"],
+        )
         return run.info.run_id
 
 
@@ -366,7 +381,12 @@ def main() -> None:
     parser.add_argument("--config", type=Path, default=Path("configs/training.yaml"))
     args = parser.parse_args()
     run_id = run_training(args.config)
-    print(f"MLflow run: {run_id}")
+    emit_event(
+        "training_cli_completed",
+        "training",
+        status="succeeded",
+        mlflow_run_id=run_id,
+    )
 
 
 if __name__ == "__main__":
