@@ -98,7 +98,7 @@ services:
     build:
       context: deploy/mlflow
     environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-key.json
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/mena-gcp-key.json
     ports:
       - "5000:5000"
     volumes:
