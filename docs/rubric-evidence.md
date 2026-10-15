@@ -19,7 +19,7 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Drift detection | Evidently/PSI report and Airflow DAG | Successful Airflow task and generated report |
 | Feedback loop | Redis consumer and Streamlit reviewer | Automatic uncertain example, review, and deferred status |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |
-| Retraining gate | `configs/feedback.yaml` and `run_retraining.py` | Threshold check and candidate run when thresholds are met |
+| Retraining gate | `configs/feedback.yaml` and `submit_vertex_retraining.py` | Threshold check and candidate run when thresholds are met |
 | CI/CD | `.github/workflows/ci.yml` | Passing visible jobs and Compose smoke job |
 | Load testing | Locust scenario and reports | Final run through Nginx with throughput, p95, and failures |
 

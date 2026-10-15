@@ -209,17 +209,15 @@ For an on-demand experiment, submit a full-data training job to the Vertex T4
 worker without using the feedback or drift gate:
 
 ```bash
-uv run python scripts/submit_vertex_retraining.py \
-  --manual \
+uv run python scripts/submit_vertex_training.py \
   --job-prefix manual-training
 ```
 
-This is an on-demand Vertex GPU Custom Job and does not train on the local
-machine. For automatic production retraining, the `mena_evidently_drift` DAG
-submits the same Vertex path when either the Evidently/PSI drift trigger or
-the reviewed-feedback thresholds are reached. Automatic runs advance the
-feedback watermark only after successful training; manual experiments do not
-consume that watermark.
+This is an on-demand Vertex T4 Custom Job for the configurable initial-model
+training workflow. It does not train on the local machine and does not use
+feedback/drift gates or retraining watermarks. For automatic production
+retraining, the `mena_evidently_drift` DAG separately uses
+`scripts/submit_vertex_retraining.py`.
 
 Candidate promotion requires verified-label quality metrics:
 
