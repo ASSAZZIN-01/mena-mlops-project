@@ -231,6 +231,25 @@ class SentimentService:
         )
         return responses
 
+    @bentoml.api(
+        batchable=True,
+        max_batch_size=128,
+        max_latency_ms=50,
+    )
+    def predict_adaptive(
+        self,
+        text: str | list[str],
+        source: str = "live",
+    ) -> list[PredictionResponse]:
+        """Adaptively combine scalar requests while preserving audit records."""
+
+        texts = [text] if isinstance(text, str) else text
+        return self.predict_batch(
+            texts,
+            source=source,
+            feedback_policy="audit_only",
+        )
+
     @bentoml.api
     def health(self) -> HealthResponse:
         return HealthResponse(

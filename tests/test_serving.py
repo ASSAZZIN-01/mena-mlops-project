@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mena_mlops.serving.app import _select_onnx_providers, create_app
+from mena_mlops.serving.bento_service import SentimentService
 
 
 class FakePredictor:
@@ -104,3 +105,11 @@ def test_onnx_provider_defaults_to_cpu() -> None:
 def test_onnx_provider_fails_when_unavailable() -> None:
     with pytest.raises(RuntimeError, match="CPUExecutionProvider"):
         _select_onnx_providers({"AzureExecutionProvider"})
+
+
+def test_bento_exposes_bounded_adaptive_batch_api() -> None:
+    api = SentimentService.apis["predict_adaptive"]
+
+    assert api.batchable is True
+    assert api.max_batch_size == 128
+    assert api.max_latency_ms == 50
