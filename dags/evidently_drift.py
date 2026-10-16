@@ -22,6 +22,10 @@ def evidently_drift() -> None:
     """Run one daily report over configured monitoring windows."""
 
     project_root = os.getenv("MENA_PROJECT_ROOT", "/opt/mena-mlops-project")
+    deployment_root = os.getenv(
+        "MENA_AUTO_DEPLOY_PROJECT_ROOT",
+        project_root,
+    )
     reference = os.getenv(
         "MENA_DRIFT_REFERENCE",
         f"{project_root}/reports/monitoring/reference.jsonl",
@@ -34,6 +38,19 @@ def evidently_drift() -> None:
         "MENA_DRIFT_OUTPUT",
         f"{project_root}/reports/drift",
     )
+    release_decision_output = os.getenv(
+        "MENA_RETRAINING_RELEASE_DECISION",
+        f"{project_root}/reports/retraining/release-decision-uri.txt",
+    )
+    deployment_output_dir = os.getenv(
+        "MENA_AUTO_DEPLOY_OUTPUT",
+        f"{deployment_root}/models/automatic-candidate-release",
+    )
+    canary_duration = os.getenv(
+        "MENA_AUTO_CANARY_STAGE_DURATION_SECONDS",
+        "600",
+    )
+    candidate_percent = os.getenv("MENA_AUTO_DEPLOY_CANDIDATE_PERCENT", "5")
     feedback_config = f"{project_root}/configs/feedback.yaml"
     run_report = " ".join(
         [
@@ -62,9 +79,40 @@ def evidently_drift() -> None:
             + shlex.quote(feedback_config)
             + " --drift-summary "
             + shlex.quote(f"{output_dir}/drift_summary.json")
+            + " --release-decision-output "
+            + shlex.quote(release_decision_output)
         ),
     )
-    drift_report >> retrain
+    deploy = BashOperator(
+        task_id="deploy_approved_retraining_release",
+        bash_command=" ".join(
+            [
+                "if [ ! -s",
+                shlex.quote(release_decision_output),
+                "]; then",
+                "echo 'No successful retraining release to deploy';",
+                "exit 0;",
+                "fi;",
+                "decision_uri=$(cat",
+                shlex.quote(release_decision_output),
+                ");",
+                "cd",
+                shlex.quote(deployment_root),
+                "&&",
+                "python",
+                "scripts/deploy_approved_candidate.py",
+                "--decision",
+                '"$decision_uri"',
+                "--output-dir",
+                shlex.quote(deployment_output_dir),
+                "--candidate-percent",
+                shlex.quote(candidate_percent),
+                "--stage-duration-seconds",
+                shlex.quote(canary_duration),
+            ]
+        ),
+    )
+    drift_report >> retrain >> deploy
 
 
 evidently_drift()
