@@ -4,6 +4,7 @@ import pandas as pd
 
 from mena_mlops.monitoring.drift import (
     build_monitoring_features,
+    publish_psi_metrics,
     run_drift_report,
 )
 from mena_mlops.retraining import (
@@ -42,6 +43,42 @@ def test_drift_report_writes_machine_summary(tmp_path) -> None:
     assert (tmp_path / "drift_report.html").is_file()
     saved = json.loads((tmp_path / "drift_summary.json").read_text())
     assert saved["drift_detected"] is True
+    assert "mena_drift_psi_max" in (tmp_path / "psi.prom").read_text()
+
+
+def test_publish_psi_metrics_sends_prometheus_text(monkeypatch) -> None:
+    captured = {}
+
+    class Response:
+        status = 202
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["body"] = request.data.decode()
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr(
+        "mena_mlops.monitoring.drift.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    publish_psi_metrics(
+        "http://pushgateway:9091/",
+        "mena_drift_psi_max 0.3\n",
+    )
+
+    assert captured == {
+        "url": "http://pushgateway:9091/metrics/job/mena_evidently_drift",
+        "body": "mena_drift_psi_max 0.3\n",
+        "timeout": 10,
+    }
 
 
 def test_retraining_triggers_when_drift_is_detected_without_feedback() -> None:

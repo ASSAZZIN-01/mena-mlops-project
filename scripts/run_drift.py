@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -20,6 +21,9 @@ def main() -> None:
         pd.read_json(args.reference, lines=True),
         pd.read_json(args.current, lines=True),
         args.output_dir,
+        prometheus_pushgateway_url=os.getenv(
+            "MENA_PROMETHEUS_PUSHGATEWAY_URL"
+        ),
     )
     print(summary)
 
