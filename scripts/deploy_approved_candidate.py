@@ -65,6 +65,39 @@ def _download_bundle(source: str, destination: Path) -> None:
             shutil.copy2(item, target)
 
 
+def _write_deployed_baseline(
+    decision: dict[str, object],
+    identity: dict[str, object],
+    path: Path,
+) -> None:
+    selected_variant = str(decision["selected_variant"])
+    results = decision.get("results")
+    if not isinstance(results, dict) or not isinstance(
+        results.get(selected_variant), dict
+    ):
+        raise RuntimeError("promotion decision has no selected variant benchmark")
+    result = results[selected_variant]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "model_id": identity["model_id"],
+                "selected_variant": selected_variant,
+                "quality": result["quality"],
+                "latency": result["latency"],
+                "hardware": {
+                    "backend": "onnxruntime",
+                    "provider": "CPUExecutionProvider",
+                },
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -86,6 +119,11 @@ def main() -> None:
     parser.add_argument("--skip-compose", action="store_true")
     parser.add_argument("--manual-canary", action="store_true")
     parser.add_argument("--stage-duration-seconds", type=int, default=600)
+    parser.add_argument(
+        "--deployed-baseline-path",
+        type=Path,
+        default=Path("reports/retraining/deployed_baseline.json"),
+    )
     args = parser.parse_args()
 
     if not 1 <= args.candidate_percent <= 99:
@@ -171,6 +209,11 @@ def main() -> None:
             ],
             check=True,
             env=environment,
+        )
+        _write_deployed_baseline(
+            decision,
+            identity,
+            args.deployed_baseline_path,
         )
         emit_event("candidate_services_started", "deployment", status="running")
         if not args.manual_canary:

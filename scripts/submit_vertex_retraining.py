@@ -226,6 +226,16 @@ def main() -> None:
         for split in ("train", "validation", "test"):
             _upload(args.data_dir / f"{split}.parquet", f"{prefix}/{split}.parquet")
         _upload(feedback_path, f"{prefix}/feedback.parquet")
+    deployed_baseline_path = Path(
+        os.getenv(
+            "DEPLOYED_MODEL_BASELINE_PATH",
+            "reports/retraining/deployed_baseline.json",
+        )
+    )
+    deployed_baseline_uri: str | None = None
+    if deployed_baseline_path.is_file():
+        deployed_baseline_uri = f"{prefix}/deployed_baseline.json"
+        _upload(deployed_baseline_path, deployed_baseline_uri)
     lineage_fd, lineage_name = tempfile.mkstemp(prefix="vertex-retraining-lineage-")
     os.close(lineage_fd)
     lineage_path = Path(lineage_name)
@@ -301,6 +311,13 @@ def main() -> None:
             ],
         },
     }
+    if deployed_baseline_uri is not None:
+        job_spec["jobSpec"]["workerPoolSpecs"][0]["containerSpec"]["env"].append(
+            {
+                "name": "VERTEX_DEPLOYED_BASELINE_URI",
+                "value": deployed_baseline_uri,
+            }
+        )
     emit_event(
         "retraining_submission_started",
         "automatic_retraining",

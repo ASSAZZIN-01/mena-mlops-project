@@ -46,7 +46,11 @@ def build_deployment_identity(
         raise RuntimeError(
             "model card selected variant does not match the promotion decision"
         )
-    return {
+    results = decision.get("results")
+    selected_result = (
+        results.get(selected_variant) if isinstance(results, dict) else None
+    )
+    identity = {
         "schema_version": "1.0",
         "model_id": model_id,
         "model_card_uri": (
@@ -59,6 +63,14 @@ def build_deployment_identity(
         "promotion_decision_uri": decision_uri,
         "promotion_decision_sha256": _json_hash(decision),
         "selected_variant": selected_variant,
+        "deployed_model_gate": decision.get("deployed_model_gate"),
         "deployment_stage": "candidate",
         "deployed_at": datetime.now(UTC).isoformat(),
     }
+    if isinstance(selected_result, dict):
+        latency = selected_result.get("latency")
+        identity["quality_metrics"] = selected_result.get("quality")
+        identity["latency_metrics"] = latency
+        if isinstance(latency, dict):
+            identity["throughput_rps"] = latency.get("throughput_rps")
+    return identity

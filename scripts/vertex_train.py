@@ -99,6 +99,11 @@ def main() -> None:
         quality_config = load_yaml(Path("configs/quality.yaml"))
         gate = promotion_config["quality_gate"]
         optimization = quality_config["optimization"]
+        deployed_baseline = None
+        baseline_path = root / "deployed_baseline.json"
+        if os.environ.get("VERTEX_DEPLOYED_BASELINE_URI"):
+            _download(os.environ["VERTEX_DEPLOYED_BASELINE_URI"], baseline_path)
+            deployed_baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
         decision = evaluate_and_gate_candidate(
             root / "model",
             data_dir / "test.parquet",
@@ -115,6 +120,10 @@ def main() -> None:
             },
             maximum_macro_f1_drop_percent=float(
                 optimization["maximum_macro_f1_drop_percent"]
+            ),
+            deployed_baseline=deployed_baseline,
+            maximum_deployed_performance_regression_percent=float(
+                optimization["maximum_deployed_performance_regression_percent"]
             ),
             max_length=int(config["training"]["max_length"]),
         )

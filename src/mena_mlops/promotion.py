@@ -17,7 +17,11 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from mena_mlops.deployment.quality_gate import evaluate_quality_gate
 from mena_mlops.observability import emit_event
 from mena_mlops.optimization import benchmark_callable, export_onnx_model, onnx_predict
-from mena_mlops.quality import check_optimization_quality, select_optimization_variant
+from mena_mlops.quality import (
+    check_optimization_quality,
+    compare_deployed_model,
+    select_optimization_variant,
+)
 from mena_mlops.training.evaluation import evaluate_predictions
 
 LABEL_NAMES = ["negative", "neutral", "positive"]
@@ -119,6 +123,8 @@ def evaluate_and_gate_candidate(
     minimum_improvement: float,
     minimum_class_f1: dict[str, float],
     maximum_macro_f1_drop_percent: float,
+    deployed_baseline: dict[str, Any] | None = None,
+    maximum_deployed_performance_regression_percent: float = 3.0,
     max_length: int = 128,
     iterations: int = 20,
 ) -> dict[str, Any]:
@@ -220,10 +226,24 @@ def evaluate_and_gate_candidate(
         minimum_improvement=minimum_improvement,
         minimum_class_f1=minimum_class_f1,
     )
+    deployed_failures = (
+        ["deployed model baseline is unavailable"]
+        if deployed_baseline is None
+        else compare_deployed_model(
+            deployed_baseline,
+            results[selected] if selected is not None else baseline,
+            maximum_regression_percent=maximum_deployed_performance_regression_percent,
+        )
+    )
     decision = {
         "status": (
             "approved"
-            if selected is not None and not optimization_failures and quality_accepted
+            if (
+                selected is not None
+                and not optimization_failures
+                and quality_accepted
+                and not deployed_failures
+            )
             else "rejected"
         ),
         "selected_variant": selected,
@@ -234,6 +254,13 @@ def evaluate_and_gate_candidate(
         "optimization_gate": {
             "accepted": selected is not None and not optimization_failures,
             "failures": optimization_failures,
+        },
+        "deployed_model_gate": {
+            "accepted": not deployed_failures,
+            "failures": deployed_failures,
+            "maximum_regression_percent": (
+                maximum_deployed_performance_regression_percent
+            ),
         },
         "results": results,
         "stable_macro_f1": stable_macro_f1,
