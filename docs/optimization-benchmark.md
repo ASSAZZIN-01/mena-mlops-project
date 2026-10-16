@@ -68,10 +68,12 @@ deployment topology is selected.
 ## Vectorized serving benchmark
 
 The serving path supports vectorized tokenizer and ONNX Runtime calls through
-the BentoML `predict_batch` API. The scalar `predict` API remains available
-for live traffic. Benchmark both paths and report p50, mean, p95, throughput,
-CPU, and memory; a sequential HTTP upload is not a valid measurement of
-vectorized inference.
+the BentoML `predict_batch` API. It also exposes `predict_adaptive` with
+`batchable=True`, a 128-request maximum, and a 50 ms batching window for
+callers that submit individual requests but can tolerate bounded queueing.
+The scalar `predict` API remains available for strict low-latency live traffic.
+Benchmark all paths and report p50, mean, p95, throughput, CPU, and memory; a
+sequential HTTP upload is not a valid measurement of vectorized inference.
 
 The first CPU-only Compose comparison used 10 Locust users for 30 seconds per
 scenario. Batch throughput is normalized to rows per second:

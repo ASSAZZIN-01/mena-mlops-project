@@ -34,6 +34,8 @@ evidence session:
 - Compose model readiness continues to use Bento's `/healthz` liveness route.
 - Drift writes `psi.prom`, publishes the same exposition to Pushgateway, and
   Prometheus scrapes the Pushgateway job.
+- BentoML includes both explicit vectorized batching and an adaptive
+  `batchable=True` API with bounded batch size/latency.
 - The six-layer student model distilled from the twelve-layer AraBERT teacher
   is part of the model evidence set; retain its exact artifact path and
   commit hash with the submission bundle.
