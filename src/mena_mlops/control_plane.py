@@ -40,6 +40,8 @@ AUDIT_DB = Path(
 FEEDBACK_CONFIG = Path(
     os.getenv("FEEDBACK_CONFIG", str(PROJECT_ROOT / "configs" / "feedback.yaml"))
 )
+VERTEX_PROJECT_ID = os.getenv("VERTEX_PROJECT_ID")
+VERTEX_REGION = os.getenv("VERTEX_REGION", "us-central1")
 registry = ReleaseRegistry(REGISTRY_PATH)
 app = FastAPI(title="MENA MLOps control plane", version="1.0.0")
 
@@ -276,11 +278,30 @@ def deployments() -> dict[str, object]:
 @app.get("/api/models")
 def models() -> dict[str, object]:
     baseline_path = PROJECT_ROOT / "reports" / "retraining" / "deployed_baseline.json"
+    links = {
+        "mlflow": os.getenv("MLFLOW_PUBLIC_URL", "http://localhost:5000"),
+        "airflow": os.getenv("AIRFLOW_URL", "http://localhost:8081"),
+        "grafana": os.getenv("GRAFANA_URL", "http://localhost:3000"),
+        "prometheus": os.getenv(
+            "PROMETHEUS_PUBLIC_URL", "http://localhost:9090"
+        ),
+    }
+    links["vertex_ai"] = "https://console.cloud.google.com/vertex-ai/model-registry"
+    if VERTEX_PROJECT_ID:
+        links["vertex_ai"] += (
+            f"?project={VERTEX_PROJECT_ID}&location={VERTEX_REGION}"
+            "&cloudshell=false"
+        )
     if not baseline_path.is_file():
-        return {"current": None, "candidates": registry.list_releases()}
+        return {
+            "current": None,
+            "candidates": registry.list_releases(),
+            "links": links,
+        }
     return {
         "current": json.loads(baseline_path.read_text(encoding="utf-8")),
         "candidates": registry.list_releases(),
+        "links": links,
     }
 
 

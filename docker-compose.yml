@@ -136,6 +136,8 @@ services:
       MLFLOW_PUBLIC_URL: http://localhost:5000
       AIRFLOW_URL: http://localhost:8081
       GRAFANA_URL: http://localhost:3000
+      VERTEX_PROJECT_ID: ${VERTEX_PROJECT_ID:-}
+      VERTEX_REGION: ${VERTEX_REGION:-us-central1}
       FEEDBACK_URL: http://localhost:8503/reviewer
       FEEDBACK_DB: /opt/mena-mlops-project/data/feedback/reviewed.db
       AUDIT_DB: /opt/mena-mlops-project/data/audit/predictions.db

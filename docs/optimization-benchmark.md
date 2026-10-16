@@ -3,6 +3,10 @@
 The benchmark uses the same `models/arabert-debug` artifact and the same
 1,225-row test split for every representation. The PyTorch model remains the
 canonical artifact; ONNX files are deployment variants generated from it.
+Runtime benchmark records now include p50, mean, and p95 latency. The control
+center displays p95 as the tail-latency signal required for deployment
+decisions; older deployed baselines that predate p50 capture are shown as
+`Not recorded` rather than inferred from mean or p95.
 
 ## Production deployment
 

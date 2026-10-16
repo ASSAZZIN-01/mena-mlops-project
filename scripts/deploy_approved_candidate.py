@@ -91,6 +91,12 @@ def _write_deployed_baseline(
                     "backend": "onnxruntime",
                     "provider": "CPUExecutionProvider",
                 },
+                "model_card_uri": identity.get("model_card_uri"),
+                "release_uri": identity.get("release_uri"),
+                "promotion_decision_uri": identity.get(
+                    "promotion_decision_uri"
+                ),
+                "deployed_at": identity.get("deployed_at"),
             },
             indent=2,
             ensure_ascii=False,

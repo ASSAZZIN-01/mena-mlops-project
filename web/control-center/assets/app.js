@@ -8,6 +8,9 @@ const statusClass = (value) => `status status-${String(value || "unknown").repla
 const statusBadge = (value) => `<span class="${statusClass(value)}">${escapeHtml(value || "unknown")}</span>`;
 const productionBadge = () => '<span class="production-badge">ON PROD</span>';
 const formatDate = (value) => value ? new Date(value).toLocaleString() : "—";
+const latencyMetric = (latency, key) => latency?.[key] == null
+  ? "Not recorded"
+  : `${Number(latency[key]).toFixed(2)} ms`;
 
 async function getJson(path) {
   const response = await fetch(path);
@@ -52,6 +55,7 @@ function renderOverview() {
         <div class="production-heading">${productionBadge()}<strong>${escapeHtml(state.deployments.current.model_id || "Active model")}</strong></div>
         <p class="muted">This baseline is active in serving but is not linked to a recorded release lifecycle entry.</p>
         <p>Variant: <strong>${escapeHtml(state.deployments.current.selected_variant || "unknown")}</strong> · Macro-F1: <strong>${Number(state.deployments.current.quality?.macro_f1 || 0).toFixed(4)}</strong></p>
+        <p class="muted">Latency p95: ${latencyMetric(state.deployments.current.latency, "p95_ms")}</p>
       </article>` : ""}
       <article class="panel">
         <h2>Service health</h2>
@@ -148,7 +152,7 @@ async function renderDeployments() {
   state.deployments = data;
   const current = data.current;
   $("#view-deployments").innerHTML = `<article class="panel"><h2>Current deployment</h2>
-    ${current ? `<div class="two-col"><div><p class="eyebrow">Active model</p><div class="production-heading">${productionBadge()}<h2>${escapeHtml(current.model_id || "unknown")}</h2></div><p class="muted">Variant: ${escapeHtml(current.selected_variant || "unknown")}</p><p class="muted">The active baseline is not linked to a release record yet.</p></div><div><p class="eyebrow">Performance baseline</p><p>Macro-F1: <strong>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</strong></p><p>Latency: <strong>${Number(current.latency?.mean_ms || 0).toFixed(2)} ms</strong></p><p>Throughput: <strong>${Number(current.latency?.throughput_rps || 0).toFixed(2)} req/s</strong></p></div></div>` : '<p class="empty">No deployed baseline is recorded.</p>'}
+    ${current ? `<div class="two-col"><div><p class="eyebrow">Active model</p><div class="production-heading">${productionBadge()}<h2>${escapeHtml(current.model_id || "unknown")}</h2></div><p class="muted">Variant: ${escapeHtml(current.selected_variant || "unknown")}</p><p class="muted">The active baseline is not linked to a release record yet.</p></div><div><p class="eyebrow">Performance baseline</p><p>Macro-F1: <strong>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</strong></p><p>Latency p50: <strong>${latencyMetric(current.latency, "p50_ms")}</strong></p><p>Latency p95: <strong>${latencyMetric(current.latency, "p95_ms")}</strong></p><p>Throughput: <strong>${Number(current.latency?.throughput_rps || 0).toFixed(2)} req/s</strong></p></div></div>` : '<p class="empty">No deployed baseline is recorded.</p>'}
   </article><article class="panel"><h2>Release deployment history</h2>
     ${data.history.length ? data.history.map((release) => `<div class="release-row" onclick="showRelease('${escapeHtml(release.release_id)}')"><div><strong>${escapeHtml(release.release_id)}</strong><div class="muted">${formatDate(release.completed_at)}</div></div><div>${statusBadge(release.status)}</div><div>${statusBadge(release.deployment_status)}</div><div>View →</div></div>`).join("") : '<p class="empty">No deployment attempts recorded.</p>'}</article>`;
 }
@@ -156,9 +160,18 @@ async function renderDeployments() {
 async function renderModels() {
   const data = await getJson("/api/models");
   const current = data.current;
+  const links = {
+    ...(data.links || {}),
+    ...(current?.model_card_uri ? { model_card: current.model_card_uri } : {}),
+    ...(current?.release_uri ? { release_bundle: current.release_uri } : {}),
+    ...(current?.promotion_decision_uri ? { promotion_decision: current.promotion_decision_uri } : {}),
+  };
+  const linkRows = Object.entries(links).map(([name, url]) =>
+    `<tr><td>${escapeHtml(name.replaceAll("_", " "))}</td><td><a class="button-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Open →</a></td></tr>`
+  ).join("");
   $("#view-models").innerHTML = `<article class="panel"><h2>Model identity</h2>
-    ${current ? `<table><tbody><tr><th>Model ID</th><td>${escapeHtml(current.model_id)}</td></tr><tr><th>Variant</th><td>${escapeHtml(current.selected_variant)}</td></tr><tr><th>Backend</th><td>${escapeHtml(current.hardware?.backend)} / ${escapeHtml(current.hardware?.provider)}</td></tr><tr><th>Macro-F1</th><td>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</td></tr></tbody></table>` : '<p class="empty">No model identity baseline found.</p>'}
-  </article><article class="panel"><h2>Candidate history</h2><p class="muted">Use Retraining & releases to inspect every gate and its evidence. This registry currently contains ${data.candidates.length} release record(s).</p></article>`;
+    ${current ? `<table><tbody><tr><th>Model ID</th><td>${escapeHtml(current.model_id)}</td></tr><tr><th>Variant</th><td>${escapeHtml(current.selected_variant)}</td></tr><tr><th>Backend</th><td>${escapeHtml(current.hardware?.backend)} / ${escapeHtml(current.hardware?.provider)}</td></tr><tr><th>Macro-F1</th><td>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</td></tr><tr><th>Latency p50</th><td>${latencyMetric(current.latency, "p50_ms")}</td></tr><tr><th>Latency p95</th><td>${latencyMetric(current.latency, "p95_ms")}</td></tr><tr><th>Throughput</th><td>${Number(current.latency?.throughput_rps || 0).toFixed(2)} req/s</td></tr></tbody></table>` : '<p class="empty">No model identity baseline found.</p>'}
+  </article><article class="panel"><h2>Model and platform links</h2><table><thead><tr><th>Resource</th><th>Open</th></tr></thead><tbody>${linkRows || '<tr><td colspan="2" class="empty">No external links configured.</td></tr>'}</tbody></table></article><article class="panel"><h2>Candidate history</h2><p class="muted">Use Retraining & releases to inspect every gate and its evidence. This registry currently contains ${data.candidates.length} release record(s).</p></article>`;
 }
 
 function renderLinks() {
