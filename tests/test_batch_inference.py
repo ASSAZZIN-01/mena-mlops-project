@@ -19,6 +19,11 @@ class FakePredictor:
         label = "positive" if "ممتاز" in text else "negative"
         return label, {"negative": 0.1, "neutral": 0.2, "positive": 0.7}
 
+    def predict_batch(
+        self, texts: list[str]
+    ) -> list[tuple[str, dict[str, float]]]:
+        return [self.predict(text) for text in texts]
+
 
 def test_batch_prediction_preserves_input_and_adds_metadata() -> None:
     records = predict_batch([{"id": "a", "text": "خدمة ممتازة"}], FakePredictor())
@@ -42,6 +47,27 @@ def test_batch_jsonl_round_trip(tmp_path: Path) -> None:
 
     result = pd.read_json(output, lines=True)
     assert result.loc[0, "prediction"] == "positive"
+
+
+def test_batch_prediction_calls_vectorized_predictor() -> None:
+    class TrackingPredictor(FakePredictor):
+        def __init__(self) -> None:
+            self.calls: list[list[str]] = []
+
+        def predict_batch(
+            self, texts: list[str]
+        ) -> list[tuple[str, dict[str, float]]]:
+            self.calls.append(texts)
+            return super().predict_batch(texts)
+
+    predictor = TrackingPredictor()
+    predict_batch(
+        [{"text": "خدمة ممتازة"}, {"text": "خدمة سيئة"}],
+        predictor,
+        batch_size=1,
+    )
+
+    assert predictor.calls == [["خدمة ممتازة"], ["خدمة سيئة"]]
 
 
 def test_batch_input_requires_text(tmp_path: Path) -> None:

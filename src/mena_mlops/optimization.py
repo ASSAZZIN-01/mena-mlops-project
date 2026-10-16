@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import resource
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -52,6 +53,45 @@ def benchmark_callable(
         "mean_ms": sum(samples) / len(samples),
         "p95_ms": samples[min(len(samples) - 1, int(len(samples) * 0.95))],
         "throughput_rps": 1000.0 * len(samples) / sum(samples),
+    }
+
+
+def benchmark_batch_callable(
+    predict_batch: Callable[[], object],
+    *,
+    batch_size: int,
+    iterations: int = 20,
+    warmup: int = 5,
+) -> dict[str, float]:
+    """Measure batch latency, item throughput, CPU time, and peak RSS."""
+
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+    if iterations < 1 or warmup < 0:
+        raise ValueError("iterations must be positive and warmup cannot be negative")
+    for _ in range(warmup):
+        predict_batch()
+    samples: list[float] = []
+    cpu_started = time.process_time()
+    rss_started = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    for _ in range(iterations):
+        started = time.perf_counter()
+        predict_batch()
+        samples.append((time.perf_counter() - started) * 1000)
+    cpu_ms = (time.process_time() - cpu_started) * 1000
+    rss_now = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    rss_scale = 1024 * 1024 if rss_now > 10_000 else 1024
+    samples.sort()
+    total_ms = sum(samples)
+    return {
+        "batch_size": float(batch_size),
+        "iterations": float(iterations),
+        "p50_ms": samples[min(len(samples) - 1, int(len(samples) * 0.50))],
+        "mean_ms": total_ms / len(samples),
+        "p95_ms": samples[min(len(samples) - 1, int(len(samples) * 0.95))],
+        "throughput_rps": 1000.0 * batch_size * len(samples) / total_ms,
+        "cpu_ms_per_batch": cpu_ms / iterations,
+        "peak_memory_mb": max(0.0, (rss_now - rss_started) / rss_scale),
     }
 
 
@@ -130,3 +170,27 @@ def onnx_predict(
         if input_spec.name in encoded
     }
     return np.asarray(session.run(["logits"], inputs)[0][0])
+
+
+def onnx_predict_batch(
+    session: Any,
+    tokenizer: Any,
+    texts: list[str],
+    *,
+    max_length: int = 128,
+) -> np.ndarray:
+    """Run one ONNX inference for a batch of texts and return batch logits."""
+
+    encoded = tokenizer(
+        texts,
+        return_tensors="np",
+        padding=True,
+        truncation=True,
+        max_length=max_length,
+    )
+    inputs = {
+        input_spec.name: encoded[input_spec.name].astype(np.int64)
+        for input_spec in session.get_inputs()
+        if input_spec.name in encoded
+    }
+    return np.asarray(session.run(["logits"], inputs)[0])

@@ -46,3 +46,43 @@ def test_audit_record_marks_uncertain_predictions_pending(tmp_path) -> None:
         ).fetchone()[0]
 
     assert status == "pending"
+
+
+def test_audit_record_many_persists_one_batch(tmp_path) -> None:
+    store = PredictionAuditStore(tmp_path / "audit.db")
+
+    store.record_many(
+        [
+            {
+                "request_id": "batch-1",
+                "input_id": "row-1",
+                "source": "batch",
+                "text": "نص أول",
+                "prediction": "positive",
+                "probabilities": {
+                    "negative": 0.1,
+                    "neutral": 0.2,
+                    "positive": 0.7,
+                },
+                "model_version": "onnx-int8-v1",
+            },
+            {
+                "request_id": "batch-2",
+                "input_id": "row-2",
+                "source": "batch",
+                "text": "نص ثان",
+                "prediction": "negative",
+                "probabilities": {
+                    "negative": 0.9,
+                    "neutral": 0.05,
+                    "positive": 0.05,
+                },
+                "model_version": "onnx-int8-v1",
+            },
+        ]
+    )
+
+    with store._connect() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM predictions"
+        ).fetchone()[0] == 2

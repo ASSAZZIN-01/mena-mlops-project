@@ -24,6 +24,10 @@ class Predictor(Protocol):
 
     def predict(self, text: str) -> tuple[str, dict[str, float]]: ...
 
+    def predict_batch(
+        self, texts: list[str]
+    ) -> list[tuple[str, dict[str, float]]]: ...
+
 
 class PredictionRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4_000)
@@ -35,6 +39,14 @@ class PredictionResponse(BaseModel):
     model_version: str
 
 
+class BatchPredictionRequest(BaseModel):
+    texts: list[str] = Field(min_length=1, max_length=128)
+
+
+class BatchPredictionResponse(BaseModel):
+    predictions: list[PredictionResponse]
+
+
 class HealthResponse(BaseModel):
     status: str
     model_version: str
@@ -42,22 +54,13 @@ class HealthResponse(BaseModel):
 
 def _select_onnx_providers(
     available: set[str],
-    device: str,
-    configured: str | None,
 ) -> list[str]:
-    if configured:
-        requested = [item.strip() for item in configured.split(",") if item.strip()]
-    elif device.lower() == "cuda":
-        requested = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    else:
-        requested = ["CPUExecutionProvider"]
-    selected = [provider for provider in requested if provider in available]
-    if not selected:
+    if "CPUExecutionProvider" not in available:
         raise RuntimeError(
-            "none of the requested ONNX Runtime providers are available: "
-            f"requested={requested}, available={sorted(available)}"
+            "CPUExecutionProvider is not available in ONNX Runtime: "
+            f"available={sorted(available)}"
         )
-    return selected
+    return ["CPUExecutionProvider"]
 
 
 REQUESTS = Counter(
@@ -125,6 +128,30 @@ class TransformerPredictor:
         label = max(values, key=values.get)
         return label, values
 
+    def predict_batch(
+        self, texts: list[str]
+    ) -> list[tuple[str, dict[str, float]]]:
+        import torch
+
+        encoded = self.tokenizer(
+            texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=int(os.getenv("MODEL_MAX_LENGTH", "128")),
+        )
+        encoded = {key: value.to(self.device) for key, value in encoded.items()}
+        with torch.inference_mode():
+            probabilities = torch.softmax(self.model(**encoded).logits, dim=-1)
+        results = []
+        for row in probabilities:
+            values = {
+                self.labels[index]: round(float(probability), 6)
+                for index, probability in enumerate(row)
+            }
+            results.append((max(values, key=values.get), values))
+        return results
+
 
 @dataclass
 class OnnxPredictor:
@@ -142,8 +169,6 @@ class OnnxPredictor:
         self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_path)
         selected = _select_onnx_providers(
             set(onnxruntime.get_available_providers()),
-            os.getenv("MODEL_DEVICE", "cpu"),
-            os.getenv("ONNX_PROVIDERS"),
         )
         self.session = onnxruntime.InferenceSession(
             str(self.model_path), providers=selected
@@ -171,6 +196,30 @@ class OnnxPredictor:
         }
         return max(values, key=values.get), values
 
+    def predict_batch(
+        self, texts: list[str]
+    ) -> list[tuple[str, dict[str, float]]]:
+        from mena_mlops.optimization import onnx_predict_batch
+
+        logits_batch = onnx_predict_batch(
+            self.session,
+            self.tokenizer,
+            texts,
+            max_length=self.max_length,
+        )
+        results = []
+        for logits in logits_batch:
+            values_array = np.asarray(logits, dtype=np.float64).reshape(-1)
+            shifted = values_array - np.max(values_array)
+            probabilities = np.exp(shifted)
+            probabilities /= np.sum(probabilities)
+            values = {
+                self.labels[index]: round(float(probability), 6)
+                for index, probability in enumerate(probabilities.tolist())
+            }
+            results.append((max(values, key=values.get), values))
+        return results
+
 
 def _load_predictor() -> Predictor:
     if os.getenv("MODEL_BACKEND", "pytorch").lower() == "onnx":
@@ -188,13 +237,10 @@ def _load_predictor() -> Predictor:
         raise RuntimeError(
             f"MODEL_PATH does not point to a model directory: {model_path}"
         )
-    requested_device = os.getenv("MODEL_DEVICE", "auto")
-    if requested_device == "auto":
-        requested_device = "cpu"
     return TransformerPredictor(
         model_path=model_path,
         model_version=os.getenv("MODEL_VERSION", model_path.name),
-        device=requested_device,
+        device="cpu",
     )
 
 
@@ -272,6 +318,39 @@ def create_app(predictor: Predictor | None = None) -> FastAPI:
                     model_version=loaded.model_version,
                     deployment_stage=deployment_stage,
                 )
+
+    @app.post("/predict_batch", response_model=BatchPredictionResponse)
+    def predict_batch(
+        payload: BatchPredictionRequest, request: Request
+    ) -> BatchPredictionResponse:
+        loaded = app.state.predictor
+        if loaded is None:
+            raise HTTPException(status_code=503, detail="model is not loaded")
+        started = time.perf_counter()
+        source = request.headers.get("x-source", "batch")
+        try:
+            predictions = loaded.predict_batch(payload.texts)
+            return BatchPredictionResponse(
+                predictions=[
+                    PredictionResponse(
+                        label=label,
+                        probabilities=probabilities,
+                        model_version=loaded.model_version,
+                    )
+                    for label, probabilities in predictions
+                ]
+            )
+        except Exception as error:
+            emit_error(
+                "batch_prediction_failed",
+                "gateway",
+                error,
+                source=source,
+                model_version=loaded.model_version,
+                batch_size=len(payload.texts),
+                latency_ms=round((time.perf_counter() - started) * 1000, 3),
+            )
+            raise
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> PlainTextResponse:

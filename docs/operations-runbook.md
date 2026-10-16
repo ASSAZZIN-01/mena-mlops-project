@@ -165,26 +165,14 @@ automatic rollback.
 
 The inference image is separate from the training image and contains no
 PyTorch dependency. It serves the published ONNX representation through CPU
-ONNX Runtime by default:
+ONNX Runtime:
 
 ```bash
-ONNXRUNTIME_PACKAGE=onnxruntime INFERENCE_DEVICE=cpu \
 docker compose up -d --build model-stable model-candidate feedback-consumer
 ```
 
-For a GPU inference host with compatible CUDA libraries, select the GPU
-runtime explicitly:
-
-```bash
-ONNXRUNTIME_PACKAGE=onnxruntime-gpu \
-INFERENCE_DEVICE=cuda \
-ONNX_PROVIDERS=CUDAExecutionProvider,CPUExecutionProvider \
-docker compose up -d --build model-stable model-candidate feedback-consumer
-```
-
-Provider selection is validated at startup. The service fails clearly when a
-requested provider is not available instead of silently falling back to an
-unexpected execution backend.
+Provider selection is fixed to `CPUExecutionProvider`; GPU inference is not
+part of the local serving configuration.
 
 ## 4. Export and compare a candidate
 

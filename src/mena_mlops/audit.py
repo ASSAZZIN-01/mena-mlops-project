@@ -85,3 +85,59 @@ class PredictionAuditStore:
                 ),
             )
         return identifier
+
+    def record_many(
+        self,
+        records: list[dict[str, object]],
+        *,
+        review_min_confidence: float = 0.25,
+        review_max_confidence: float = 0.75,
+    ) -> None:
+        """Persist a batch of prediction records in one SQLite transaction."""
+
+        if not records:
+            return
+        rows = []
+        for record in records:
+            text = str(record["text"])
+            prediction = str(record["prediction"])
+            probabilities = record["probabilities"]
+            if not text.strip():
+                raise ValueError("audit text must not be empty")
+            if not isinstance(probabilities, dict):
+                raise ValueError("audit probabilities must be a dictionary")
+            if prediction not in probabilities:
+                raise ValueError("audit prediction is missing from probabilities")
+            source = str(record["source"])
+            if source not in {"live", "batch", "stream"}:
+                raise ValueError(f"unsupported audit source: {source}")
+            confidence = float(probabilities[prediction])
+            status = (
+                "pending"
+                if review_min_confidence <= confidence <= review_max_confidence
+                else "not_required"
+            )
+            rows.append(
+                (
+                    str(record["request_id"]),
+                    record.get("input_id"),
+                    source,
+                    text,
+                    prediction,
+                    confidence,
+                    json.dumps(probabilities, ensure_ascii=False, sort_keys=True),
+                    str(record["model_version"]),
+                    status,
+                    datetime.now(UTC).isoformat(),
+                )
+            )
+        with self._connect() as connection:
+            connection.executemany(
+                """
+                INSERT INTO predictions (
+                    request_id, input_id, source, text, prediction, confidence,
+                    probabilities, model_version, review_status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )

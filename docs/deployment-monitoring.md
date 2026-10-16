@@ -61,8 +61,11 @@ uv run python scripts/canary.py --rollback
 
 ## Batch inference
 
-Offline scoring accepts JSONL or Parquet files containing a required `text`
-column. Input fields are preserved and prediction metadata is appended:
+Offline scoring accepts CSV, JSONL, or Parquet files containing a required
+`text` column. Input fields are preserved and prediction metadata is appended.
+The dashboard and BentoML service use vectorized batches of up to 128 texts.
+Dashboard uploads are `audit_only` by default; enable reviewable feedback only
+when the dataset is intentionally meant for human annotation:
 
 ```bash
 uv run python scripts/run_batch_inference.py \
@@ -74,6 +77,19 @@ uv run python scripts/run_batch_inference.py \
 
 Each output record contains `prediction`, JSON-encoded `probabilities`,
 `model_version`, and an ISO-8601 `predicted_at` timestamp.
+
+Run the scalar and vectorized serving benchmarks separately:
+
+```bash
+bash scripts/run_load_test.sh 10 10 30s reports/locust/scalar scalar
+LOCUST_BATCH_SIZE=32 bash scripts/run_load_test.sh \
+  10 10 30s reports/locust/batch-32 batch
+```
+
+The batch load test sends `feedback_policy=audit_only`, so benchmark traffic
+is audited without creating reviewer items. Use batch sizes 32, 64, and 128
+to compare throughput and p95 tail latency; the benchmark report records
+request latency, while throughput must be multiplied by the batch size.
 
 ## Redis Streams inference
 
