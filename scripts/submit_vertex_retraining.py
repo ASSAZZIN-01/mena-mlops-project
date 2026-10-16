@@ -158,7 +158,11 @@ def main() -> None:
     store = FeedbackStore(args.database)
     checkpoint = store.retraining_checkpoint()
     feedback_upper_bound = store.latest_reviewed_id()
-    counts = store.counts_since(checkpoint.last_feedback_id)
+    feedback_time_upper_bound = store.latest_reviewed_at()
+    counts = store.counts_since(
+        checkpoint.last_feedback_id,
+        reviewed_after=checkpoint.last_reviewed_at,
+    )
     feedback_ready = feedback_thresholds_reached(counts, thresholds)
     drift_summary = (
         json.loads(args.drift_summary.read_text(encoding="utf-8"))
@@ -197,6 +201,8 @@ def main() -> None:
         args.database,
         after_id=checkpoint.last_feedback_id,
         through_id=feedback_upper_bound,
+        reviewed_after=checkpoint.last_reviewed_at,
+        reviewed_through=feedback_time_upper_bound,
     ) as feedback_path:
         for split in ("train", "validation", "test"):
             _upload(args.data_dir / f"{split}.parquet", f"{prefix}/{split}.parquet")
@@ -292,6 +298,7 @@ def main() -> None:
             current_drift_fingerprint
             if drift_ready
             else checkpoint.last_drift_fingerprint,
+            reviewed_at=feedback_time_upper_bound,
         )
 
 

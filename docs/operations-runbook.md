@@ -98,7 +98,9 @@ This always submits a Vertex T4 job and never trains on the local GPU. The
 automatic `mena_evidently_drift` DAG remains responsible for production
 retraining when PSI/Evidently drift or reviewed-feedback thresholds trigger.
 The manual command uses the selected training YAML unchanged, while the
-automatic retraining path has its own trigger, release, and watermark logic.
+automatic retraining path has its own trigger, release, and review-time
+watermark logic. Reviews are counted when they are saved, even if the
+underlying prediction was created before the previous checkpoint.
 
 After manual evaluation and promotion, create the immutable identity bundle
 from the same model, split, and promotion decision:

@@ -29,7 +29,10 @@ def main() -> None:
     }
     store = FeedbackStore(args.database)
     checkpoint = store.retraining_checkpoint()
-    counts = store.counts_since(checkpoint.last_feedback_id)
+    counts = store.counts_since(
+        checkpoint.last_feedback_id,
+        reviewed_after=checkpoint.last_reviewed_at,
+    )
     ready = all(
         counts.get(label, 0) >= required
         for label, required in thresholds.items()
