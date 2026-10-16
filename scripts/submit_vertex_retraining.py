@@ -20,6 +20,7 @@ from google.cloud import storage
 
 from mena_mlops.feedback import FeedbackStore
 from mena_mlops.observability import emit_event
+from mena_mlops.release_registry import ReleaseRegistry
 from mena_mlops.retraining import (
     drift_fingerprint,
     drift_triggered,
@@ -175,12 +176,13 @@ def main() -> None:
         for label, value in config["retraining_thresholds"].items()
     }
     store = FeedbackStore(args.database)
-    checkpoint = store.retraining_checkpoint()
+    attempt_checkpoint = store.retraining_checkpoint()
+    deployment_checkpoint = store.successful_deployment_checkpoint()
     feedback_upper_bound = store.latest_reviewed_id()
     feedback_time_upper_bound = store.latest_reviewed_at()
     counts = store.counts_since(
-        checkpoint.last_feedback_id,
-        reviewed_after=checkpoint.last_reviewed_at,
+        attempt_checkpoint.last_feedback_id,
+        reviewed_after=attempt_checkpoint.last_reviewed_at,
     )
     feedback_ready = feedback_thresholds_reached(counts, thresholds)
     drift_summary = (
@@ -191,7 +193,7 @@ def main() -> None:
     current_drift_fingerprint = drift_fingerprint(drift_summary)
     drift_ready = (
         drift_triggered(drift_summary)
-        and current_drift_fingerprint != checkpoint.last_drift_fingerprint
+        and current_drift_fingerprint != attempt_checkpoint.last_drift_fingerprint
     )
     if not args.manual and not (feedback_ready or drift_ready):
         if args.release_decision_output is not None:
@@ -216,11 +218,28 @@ def main() -> None:
         f"{args.job_prefix}-%Y%m%d-%H%M%S"
     )
     prefix = f"{staging_bucket}/{job_id}"
+    registry = ReleaseRegistry(
+        Path(
+            os.getenv(
+                "CONTROL_PLANE_DB",
+                "reports/control-plane/releases.db",
+            )
+        )
+    )
+    registry.start_release(
+        job_id,
+        trigger="manual" if args.manual else "automatic",
+        vertex_job_id=job_id,
+        payload={
+            "feedback_triggered": feedback_ready,
+            "drift_triggered": drift_ready,
+        },
+    )
     with tempfile_feedback(
         args.database,
-        after_id=checkpoint.last_feedback_id,
+        after_id=deployment_checkpoint.last_feedback_id,
         through_id=feedback_upper_bound,
-        reviewed_after=checkpoint.last_reviewed_at,
+        reviewed_after=deployment_checkpoint.last_reviewed_at,
         reviewed_through=feedback_time_upper_bound,
     ) as feedback_path:
         for split in ("train", "validation", "test"):
@@ -328,20 +347,41 @@ def main() -> None:
         drift_triggered=drift_ready,
         manual=args.manual,
     )
-    _submit_and_wait(job_spec, project, region)
+    try:
+        _submit_and_wait(job_spec, project, region)
+    except Exception as error:
+        registry.record_deployment(
+            job_id,
+            status="training_failed",
+            payload={"error": str(error)},
+        )
+        raise
+    decision_uri = f"{prefix}/release/promotion_decision.json"
     if args.release_decision_output is not None:
         _write_release_decision_uri(
             args.release_decision_output,
             f"{prefix}/release",
         )
-    if not args.manual:
-        store.mark_retraining_succeeded(
-            feedback_upper_bound,
-            current_drift_fingerprint
-            if drift_ready
-            else checkpoint.last_drift_fingerprint,
-            reviewed_at=feedback_time_upper_bound,
-        )
+    parsed = urlparse(decision_uri)
+    decision = json.loads(
+        storage.Client()
+        .bucket(parsed.netloc)
+        .blob(parsed.path.lstrip("/"))
+        .download_as_text()
+    )
+    registry.record_decision(
+        job_id,
+        decision_uri=decision_uri,
+        decision=decision,
+        payload={"vertex_job_id": job_id},
+    )
+    store.mark_retraining_attempt(
+        feedback_upper_bound,
+        current_drift_fingerprint
+        if drift_ready
+        else attempt_checkpoint.last_drift_fingerprint,
+        reviewed_at=feedback_time_upper_bound,
+    )
 
 
 class tempfile_feedback:

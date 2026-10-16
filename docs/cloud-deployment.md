@@ -233,12 +233,13 @@ script receives the generated `drift_summary.json` through `--drift-summary`,
 so a drift-only job does not wait for feedback thresholds. If neither trigger
 is active, the task exits safely without creating a GPU job.
 
-After a successful run, the feedback database records a watermark for the
-highest reviewed feedback ID included in that job. Future checks count and
-stage only reviewed rows after that watermark; the historical rows remain
-available for audit. The watermark is updated only after Vertex succeeds, so
-failed or cancelled jobs are retried with the same feedback batch. A stable
-drift summary is also fingerprinted to avoid resubmitting the same drift event.
+The feedback database maintains two cursors. The last-attempt cursor advances
+after a training attempt and prevents unchanged feedback from launching the
+same job repeatedly after a rejected candidate. The last-successful-deployment
+cursor advances only after deployment and canary verification succeed; it
+drives the user-facing count of feedback not yet represented in production.
+Historical rows remain available for audit, and a stable drift summary is
+fingerprinted to avoid resubmitting the same drift event.
 
 ## 6. Vertex quota and job checks
 

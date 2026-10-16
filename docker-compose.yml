@@ -114,6 +114,44 @@ services:
       - --server.address=0.0.0.0
       - --server.port=8501
 
+  control-plane:
+    build: .
+    depends_on:
+      nginx:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    environment:
+      MENA_PROJECT_ROOT: /opt/mena-mlops-project
+      PYTHONPATH: /opt/mena-mlops-project/src
+      CONTROL_PLANE_DB: /opt/mena-mlops-project/reports/control-plane/releases.db
+      CONTROL_PLANE_STATIC_DIR: /opt/mena-mlops-project/web/control-center
+      MODEL_API_URL: http://nginx:8080
+      PROMETHEUS_URL: http://prometheus:9090
+      MLFLOW_URL: http://mlflow:5000
+      AIRFLOW_INTERNAL_URL: http://airflow:8080
+      PROMETHEUS_PUBLIC_URL: http://localhost:9090
+      MLFLOW_PUBLIC_URL: http://localhost:5000
+      AIRFLOW_URL: http://localhost:8081
+      GRAFANA_URL: http://localhost:3000
+      VERTEX_PROJECT_ID: ${VERTEX_PROJECT_ID:-}
+      VERTEX_REGION: ${VERTEX_REGION:-us-central1}
+      FEEDBACK_URL: http://localhost:8503/reviewer
+      FEEDBACK_DB: /opt/mena-mlops-project/data/feedback/reviewed.db
+      AUDIT_DB: /opt/mena-mlops-project/data/audit/predictions.db
+      FEEDBACK_CONFIG: /opt/mena-mlops-project/configs/feedback.yaml
+    ports:
+      - "8503:8503"
+    volumes:
+      - .:/opt/mena-mlops-project
+    command:
+      - uvicorn
+      - mena_mlops.control_plane:app
+      - --host=0.0.0.0
+      - --port=8503
+
   mlflow:
     build:
       context: deploy/mlflow
@@ -201,24 +239,6 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 10
-
-  feedback-ui:
-    build: .
-    depends_on:
-      feedback-consumer:
-        condition: service_started
-    environment:
-      FEEDBACK_DB: /data/feedback/reviewed.db
-    ports:
-      - "8502:8501"
-    volumes:
-      - ./data/feedback:/data/feedback
-    command:
-      - streamlit
-      - run
-      - scripts/feedback_ui.py
-      - --server.address=0.0.0.0
-      - --server.port=8501
 
   feedback-consumer:
     build:

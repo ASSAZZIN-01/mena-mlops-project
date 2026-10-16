@@ -34,7 +34,7 @@ def benchmark_callable(
     iterations: int = 20,
     warmup: int = 5,
 ) -> dict[str, float]:
-    """Measure average and p95 wall-clock latency in milliseconds."""
+    """Measure p50, average, and p95 wall-clock latency in milliseconds."""
 
     if iterations < 1 or warmup < 0:
         raise ValueError("iterations must be positive and warmup cannot be negative")
@@ -48,6 +48,7 @@ def benchmark_callable(
     samples.sort()
     return {
         "iterations": float(iterations),
+        "p50_ms": samples[min(len(samples) - 1, int(len(samples) * 0.50))],
         "mean_ms": sum(samples) / len(samples),
         "p95_ms": samples[min(len(samples) - 1, int(len(samples) * 0.95))],
         "throughput_rps": 1000.0 * len(samples) / sum(samples),

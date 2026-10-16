@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MENA Feedback Reviewer</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MENA MLOps</p>
+        <h1>Feedback Reviewer</h1>
+      </div>
+      <div class="topbar-actions">
+        <a class="button button-secondary" href="/">Control Center</a>
+        <button id="reviewer-refresh" class="button button-secondary">Refresh</button>
+      </div>
+    </header>
+    <main class="shell">
+      <section id="reviewer-alerts"></section>
+      <section id="reviewer-progress" class="panel"></section>
+      <section class="two-col reviewer-layout">
+        <article class="panel">
+          <p class="eyebrow">One item at a time</p>
+          <h2>Review the prediction</h2>
+          <div id="reviewer-item"></div>
+        </article>
+        <aside class="panel">
+          <h2>Review guide</h2>
+          <div class="review-guide">
+            <p><strong>Correct</strong><br><span class="muted">The predicted sentiment is accurate.</span></p>
+            <p><strong>Wrong</strong><br><span class="muted">Choose the sentiment that best matches the text.</span></p>
+            <p><strong>I don't know</strong><br><span class="muted">The text is ambiguous. It is deferred and excluded from retraining.</span></p>
+          </div>
+          <h3>Class queue status</h3>
+          <div id="reviewer-classes"></div>
+        </aside>
+      </section>
+    </main>
+    <script src="/assets/reviewer.js" defer></script>
+  </body>
+</html>

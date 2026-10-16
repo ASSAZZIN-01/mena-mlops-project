@@ -147,8 +147,8 @@ diagnosis. The model registry alias and router configuration must change
 together; a version number embedded in application code is not a rollback
 mechanism.
 
-Vertex retraining now performs the release decision before a retraining
-watermark is committed. It evaluates the held-out test set, exports ONNX FP32
+Vertex retraining now performs the release decision before the attempt cursor
+is committed. It evaluates the held-out test set, exports ONNX FP32
 and dynamic-INT8 artifacts, benchmarks both optimized variants against the
 PyTorch candidate, and selects the fastest variant that stays within the
 configured macro-F1 loss limit. The selected variant is then checked against
@@ -160,6 +160,12 @@ The local Nginx canary remains an explicit deployment operation rather than an
 implicit side effect of retraining. This keeps a rejected candidate from
 changing production traffic and allows health, prediction-version, error-rate,
 and latency checks before increasing the canary percentage.
+
+Retraining feedback uses two independent cursors. The last-attempt cursor
+prevents unchanged feedback from launching another job after a rejected
+candidate. The last-successful-deployment cursor advances only after
+deployment and canary verification succeed, and drives the Control Center
+count of reviewed feedback that is not yet represented in production.
 
 ## Evidently drift reports
 
@@ -225,12 +231,22 @@ merged into the training split only after all configured thresholds are met.
 For the local demonstration, `configs/feedback.yaml` uses temporary `5/1/5`
 thresholds; restore the production `100/20/100` values afterward.
 
-Run the reviewer interface locally with:
+The reviewer interface is served by the MLOps Control Center:
 
-```bash
-FEEDBACK_DB=data/feedback/reviewed.db \
-uv run streamlit run scripts/feedback_ui.py
-```
+[`http://localhost:8503/reviewer`](http://localhost:8503/reviewer)
+
+The browser reviewer provides pending and reviewed queues with Previous/Next
+navigation. Completed items are read-only until **Fix it** is selected; edits
+update the existing feedback row rather than creating duplicates. Correct,
+Wrong, and I don't know decisions require explicit confirmation. Wrong
+requires a corrected class, while I don't know is deferred and excluded from
+retraining thresholds.
+
+The Control Center also exposes release gate evidence, exact rejection
+reasons, the active `ON PROD` baseline, model identity, feedback readiness,
+and links to Vertex AI, MLflow, Airflow, Grafana, and Prometheus. It displays
+p50, mean, and p95 latency when available. Older baselines without p50 data
+are shown as `Not recorded`, not inferred.
 
 The Redis inference consumer automatically adds predictions whose maximum
 class probability falls within the configured confidence window to this
@@ -259,10 +275,14 @@ terminates after training. The training container logs the run through the
 cloud-reachable `MLFLOW_TRACKING_URI` and configured GCS artifact location.
 
 Reviewed feedback is not deleted after retraining. The feedback database stores
-a durable checkpoint containing the highest reviewed feedback ID included in
-the last successful run. Thresholds and exports use only newer reviewed rows,
-and the checkpoint advances only after Vertex reaches `JOB_STATE_SUCCEEDED`.
-If training fails, the same feedback remains eligible for the next retry.
+two durable cursors: the last completed retraining attempt, which prevents an
+unchanged batch from retriggering every schedule, and the last successful
+deployment, which identifies feedback not yet represented in production.
+Automatic trigger thresholds use the attempt cursor; the production gap uses
+the deployment cursor. The deployment cursor advances only after the candidate
+passes its gates, deployment completes, and canary verification succeeds.
+If training or deployment fails, production remains unchanged and the feedback
+gap remains visible for the next release attempt.
 Airflow also limits the DAG to one active run so overlapping schedules cannot
 submit the same batch concurrently.
 

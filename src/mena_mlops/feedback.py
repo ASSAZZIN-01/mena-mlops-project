@@ -25,11 +25,19 @@ class FeedbackItem:
 
 @dataclass(frozen=True)
 class RetrainingCheckpoint:
-    """Last successfully consumed feedback and drift event."""
+    """Last feedback included in a completed retraining attempt."""
 
     last_feedback_id: int
     last_drift_fingerprint: str | None
     last_reviewed_at: str | None = None
+
+
+@dataclass(frozen=True)
+class DeploymentCheckpoint:
+    """Last feedback represented by a successfully deployed model."""
+
+    last_feedback_id: int
+    last_reviewed_at: str | None
 
 
 class FeedbackStore:
@@ -94,6 +102,28 @@ class FeedbackStore:
                     WHERE last_reviewed_at IS NULL
                     """
                 )
+            for column, definition in (
+                ("last_attempt_feedback_id", "INTEGER NOT NULL DEFAULT 0"),
+                ("last_attempt_reviewed_at", "TEXT"),
+                ("last_attempt_drift_fingerprint", "TEXT"),
+                ("last_deployed_feedback_id", "INTEGER NOT NULL DEFAULT 0"),
+                ("last_deployed_reviewed_at", "TEXT"),
+            ):
+                if column not in columns:
+                    connection.execute(
+                        f"ALTER TABLE retraining_state ADD COLUMN {column} {definition}"
+                    )
+            connection.execute(
+                """
+                UPDATE retraining_state
+                SET last_attempt_feedback_id = last_feedback_id,
+                    last_attempt_reviewed_at = last_reviewed_at,
+                    last_attempt_drift_fingerprint = last_drift_fingerprint
+                WHERE id = 1
+                  AND last_attempt_feedback_id = 0
+                  AND last_feedback_id != 0
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -140,6 +170,36 @@ class FeedbackStore:
             ).fetchone()
         return FeedbackItem(**dict(row)) if row else None
 
+    def pending_items(self) -> list[FeedbackItem]:
+        """Return all pending items in queue order."""
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, text, predicted_label, confidence,
+                       reviewed_label, reviewed_at, review_status
+                FROM feedback
+                WHERE reviewed_label IS NULL AND review_status = 'pending'
+                ORDER BY id
+                """
+            ).fetchall()
+        return [FeedbackItem(**dict(row)) for row in rows]
+
+    def reviewed_items(self) -> list[FeedbackItem]:
+        """Return completed annotations in review order."""
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, text, predicted_label, confidence,
+                       reviewed_label, reviewed_at, review_status
+                FROM feedback
+                WHERE review_status != 'pending'
+                ORDER BY id
+                """
+            ).fetchall()
+        return [FeedbackItem(**dict(row)) for row in rows]
+
     def review(
         self,
         item_id: int,
@@ -175,6 +235,44 @@ class FeedbackStore:
                 (datetime.now(UTC).isoformat(), item_id),
             )
 
+    def revise(
+        self,
+        item_id: int,
+        correct: bool,
+        corrected_label: str | None = None,
+        defer: bool = False,
+    ) -> None:
+        """Replace an existing annotation without creating another feedback row."""
+
+        item = self._get(item_id)
+        if defer:
+            reviewed_label = None
+            status = "deferred"
+        else:
+            reviewed_label = item.predicted_label if correct else corrected_label
+            if reviewed_label not in LABELS:
+                raise ValueError("an incorrect review requires a valid corrected label")
+            status = "validated"
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE feedback
+                SET reviewed_label = ?, reviewed_at = ?, review_status = ?
+                WHERE id = ?
+                """,
+                (
+                    reviewed_label,
+                    datetime.now(UTC).isoformat(),
+                    status,
+                    item_id,
+                ),
+            )
+
+    def get_item(self, item_id: int) -> FeedbackItem:
+        """Return one feedback item by ID."""
+
+        return self._get(item_id)
+
     def counts(self) -> dict[str, int]:
         """Count reviewed examples by their validated label."""
 
@@ -198,6 +296,54 @@ class FeedbackStore:
             )
             for label in LABELS
         }
+
+    def annotation_summary(self, audit_path: Path) -> dict[str, dict[str, int]]:
+        """Summarize prediction denominators and annotation states by label."""
+
+        summary = {
+            label: {
+                "total_predictions": 0,
+                "suspected": 0,
+                "reviewed": 0,
+                "confusing": 0,
+                "pending": 0,
+            }
+            for label in LABELS
+        }
+        if audit_path.is_file():
+            with sqlite3.connect(audit_path) as audit_connection:
+                rows = audit_connection.execute(
+                    """
+                    SELECT prediction, COUNT(*) AS count
+                    FROM predictions
+                    GROUP BY prediction
+                    """
+                ).fetchall()
+        else:
+            rows = []
+        for label, count in rows:
+            if label in summary:
+                summary[str(label)]["total_predictions"] = int(count)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT predicted_label, review_status, COUNT(*) AS count
+                FROM feedback
+                GROUP BY predicted_label, review_status
+                """
+            ).fetchall()
+        for label, status, count in rows:
+            if label not in summary:
+                continue
+            summary[str(label)]["suspected"] += int(count)
+            state_key = {
+                "validated": "reviewed",
+                "deferred": "confusing",
+                "pending": "pending",
+            }.get(str(status))
+            if state_key is not None:
+                summary[str(label)][state_key] += int(count)
+        return summary
 
     def counts_since(
         self,
@@ -249,13 +395,14 @@ class FeedbackStore:
         )
 
     def retraining_checkpoint(self) -> RetrainingCheckpoint:
-        """Return the last successful retraining checkpoint."""
+        """Return the last completed retraining-attempt checkpoint."""
 
         with self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT last_feedback_id, last_drift_fingerprint,
-                       last_reviewed_at
+                SELECT last_attempt_feedback_id AS last_feedback_id,
+                       last_attempt_drift_fingerprint AS last_drift_fingerprint,
+                       last_attempt_reviewed_at AS last_reviewed_at
                 FROM retraining_state
                 WHERE id = 1
                 """
@@ -266,6 +413,24 @@ class FeedbackStore:
             last_feedback_id=int(row["last_feedback_id"]),
             last_drift_fingerprint=row["last_drift_fingerprint"],
             last_reviewed_at=row["last_reviewed_at"],
+        )
+
+    def successful_deployment_checkpoint(self) -> DeploymentCheckpoint:
+        """Return the last feedback represented in production."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT last_deployed_feedback_id, last_deployed_reviewed_at
+                FROM retraining_state
+                WHERE id = 1
+                """
+            ).fetchone()
+        if row is None:
+            return DeploymentCheckpoint(0, None)
+        return DeploymentCheckpoint(
+            last_feedback_id=int(row["last_deployed_feedback_id"]),
+            last_reviewed_at=row["last_deployed_reviewed_at"],
         )
 
     def latest_reviewed_id(self) -> int:
@@ -294,13 +459,13 @@ class FeedbackStore:
             ).fetchone()[0]
         return str(value) if value is not None else None
 
-    def mark_retraining_succeeded(
+    def mark_retraining_attempt(
         self,
         feedback_id: int,
         drift_fingerprint: str | None,
         reviewed_at: str | None = None,
     ) -> None:
-        """Advance the checkpoint after a successful retraining job."""
+        """Advance the attempt cursor after a completed Vertex release attempt."""
 
         if feedback_id < 0:
             raise ValueError("feedback checkpoint cannot be negative")
@@ -309,22 +474,69 @@ class FeedbackStore:
                 """
                 INSERT INTO retraining_state (
                     id, last_feedback_id, last_drift_fingerprint,
-                    last_reviewed_at, updated_at
+                    last_reviewed_at, last_attempt_feedback_id,
+                    last_attempt_drift_fingerprint, last_attempt_reviewed_at,
+                    updated_at
                 )
-                VALUES (1, ?, ?, ?, ?)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     last_feedback_id = excluded.last_feedback_id,
                     last_drift_fingerprint = excluded.last_drift_fingerprint,
                     last_reviewed_at = excluded.last_reviewed_at,
+                    last_attempt_feedback_id = excluded.last_attempt_feedback_id,
+                    last_attempt_drift_fingerprint =
+                        excluded.last_attempt_drift_fingerprint,
+                    last_attempt_reviewed_at = excluded.last_attempt_reviewed_at,
                     updated_at = excluded.updated_at
                 """,
                 (
                     feedback_id,
                     drift_fingerprint,
                     reviewed_at or datetime.now(UTC).isoformat(),
+                    feedback_id,
+                    drift_fingerprint,
+                    reviewed_at or datetime.now(UTC).isoformat(),
                     datetime.now(UTC).isoformat(),
                 ),
             )
+
+    def mark_successful_deployment(
+        self,
+        feedback_id: int,
+        reviewed_at: str | None = None,
+    ) -> None:
+        """Advance the production cursor after deployment and canary success."""
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO retraining_state (
+                    id, last_feedback_id, last_deployed_feedback_id,
+                    last_deployed_reviewed_at, updated_at
+                )
+                VALUES (1, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    last_deployed_feedback_id = excluded.last_deployed_feedback_id,
+                    last_deployed_reviewed_at = excluded.last_deployed_reviewed_at,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    feedback_id,
+                    feedback_id,
+                    reviewed_at or datetime.now(UTC).isoformat(),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+
+    def mark_retraining_succeeded(
+        self,
+        feedback_id: int,
+        drift_fingerprint: str | None,
+        reviewed_at: str | None = None,
+    ) -> None:
+        """Backward-compatible alias for recording a completed attempt."""
+
+        self.mark_retraining_attempt(feedback_id, drift_fingerprint, reviewed_at)
 
     def export_reviewed(
         self,

@@ -15,6 +15,7 @@ def test_dynamic_quantization_and_benchmark() -> None:
     optimized = quantize_linear_layers(model)
     assert optimized(torch.ones(1, 2)).shape == (1, 2)
     result = benchmark_callable(lambda: optimized(torch.ones(1, 2)), iterations=2)
+    assert result["p50_ms"] >= 0
     assert result["mean_ms"] >= 0
 
 

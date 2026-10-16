@@ -15,7 +15,9 @@ from google.cloud import storage
 
 from mena_mlops.deployment.canary import docker_compose_command
 from mena_mlops.deployment_identity import build_deployment_identity
+from mena_mlops.feedback import FeedbackStore
 from mena_mlops.observability import emit_event
+from mena_mlops.release_registry import ReleaseRegistry
 
 
 def _read_decision(uri: str) -> dict[str, object]:
@@ -89,6 +91,12 @@ def _write_deployed_baseline(
                     "backend": "onnxruntime",
                     "provider": "CPUExecutionProvider",
                 },
+                "model_card_uri": identity.get("model_card_uri"),
+                "release_uri": identity.get("release_uri"),
+                "promotion_decision_uri": identity.get(
+                    "promotion_decision_uri"
+                ),
+                "deployed_at": identity.get("deployed_at"),
             },
             indent=2,
             ensure_ascii=False,
@@ -96,6 +104,14 @@ def _write_deployed_baseline(
         + "\n",
         encoding="utf-8",
     )
+
+
+def _release_id_from_decision_uri(uri: str) -> str:
+    path = urlparse(uri).path.rstrip("/")
+    parts = path.split("/")
+    if len(parts) < 3:
+        raise ValueError(f"cannot derive release ID from decision URI: {uri}")
+    return parts[-3]
 
 
 def main() -> None:
@@ -131,7 +147,24 @@ def main() -> None:
     if args.stage_duration_seconds < 0:
         parser.error("--stage-duration-seconds must be non-negative")
     decision = _read_decision(args.decision)
+    release_id = _release_id_from_decision_uri(args.decision)
+    registry = ReleaseRegistry(
+        Path(
+            os.getenv(
+                "CONTROL_PLANE_DB",
+                "reports/control-plane/releases.db",
+            )
+        )
+    )
     if decision.get("status") != "approved":
+        registry.record_deployment(
+            release_id,
+            status="not_attempted",
+            payload={
+                "reason": "release decision was not approved",
+                "decision_uri": args.decision,
+            },
+        )
         raise SystemExit("Refusing deployment: release decision is not approved.")
     selected_variant = decision.get("selected_variant")
     model_file = {
@@ -210,11 +243,6 @@ def main() -> None:
             check=True,
             env=environment,
         )
-        _write_deployed_baseline(
-            decision,
-            identity,
-            args.deployed_baseline_path,
-        )
         emit_event("candidate_services_started", "deployment", status="running")
         if not args.manual_canary:
             subprocess.run(
@@ -227,6 +255,31 @@ def main() -> None:
                 check=True,
                 env=environment,
             )
+        _write_deployed_baseline(
+            decision,
+            identity,
+            args.deployed_baseline_path,
+        )
+        registry.record_deployment(
+            release_id,
+            status="deployed",
+            payload={
+            "candidate_percent": args.candidate_percent,
+            "model_id": identity["model_id"],
+            },
+        )
+        feedback_store = FeedbackStore(
+            Path(
+                os.getenv(
+                    "FEEDBACK_DB",
+                    "data/feedback/reviewed.db",
+                )
+            )
+        )
+        feedback_store.mark_successful_deployment(
+            feedback_store.latest_reviewed_id(),
+            reviewed_at=feedback_store.latest_reviewed_at(),
+        )
     else:
         emit_event(
             "candidate_services_start_skipped",
