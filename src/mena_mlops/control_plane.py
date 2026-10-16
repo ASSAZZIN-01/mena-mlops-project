@@ -60,12 +60,22 @@ def _feedback_summary() -> dict[str, object]:
             str(label): int(value)
             for label, value in config["retraining_thresholds"].items()
         }
-        counts = FeedbackStore(FEEDBACK_DB).counts()
+        store = FeedbackStore(FEEDBACK_DB)
+        checkpoint = store.retraining_checkpoint()
+        counts = store.counts_since(
+            checkpoint.last_feedback_id,
+            reviewed_after=checkpoint.last_reviewed_at,
+        )
         return {
             "counts": counts,
+            "lifetime_counts": store.counts(),
             "thresholds": thresholds,
             "ready": all(counts[label] >= thresholds[label] for label in thresholds),
-            "annotation": FeedbackStore(FEEDBACK_DB).annotation_summary(AUDIT_DB),
+            "annotation": store.annotation_summary(AUDIT_DB),
+            "checkpoint": {
+                "last_feedback_id": checkpoint.last_feedback_id,
+                "last_reviewed_at": checkpoint.last_reviewed_at,
+            },
         }
     except (
         FileNotFoundError,
@@ -77,8 +87,10 @@ def _feedback_summary() -> dict[str, object]:
         return {
             "error": str(error),
             "counts": {},
+            "lifetime_counts": {},
             "thresholds": {},
             "annotation": {},
+            "checkpoint": {},
             "ready": False,
         }
 

@@ -26,7 +26,7 @@ function renderSummary(summary) {
   $("#reviewer-summary").innerHTML = [
     ["Pending queue", pending, "Items waiting for a human decision"],
     ["Reviewed", reviewed, "Validated labels saved"],
-    ["Validated feedback", labels.map((label) => `${label}: ${counts[label] || 0}/${thresholds[label] || 0}`).join(" · "), "Retraining gate progress"],
+    ["Next retraining progress", labels.map((label) => `${label}: ${counts[label] || 0}/${thresholds[label] || 0}`).join(" · "), "Validated since the last successful retraining"],
     ["Retraining gate", summary.ready ? "Ready" : "Collecting", "Validated labels only"],
   ].map(([label, value, detail]) =>
     `<article class="card"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div><div class="detail">${escapeHtml(detail)}</div></article>`

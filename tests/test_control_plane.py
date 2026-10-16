@@ -61,3 +61,27 @@ def test_reviewer_api_returns_and_submits_pending_item(tmp_path: Path) -> None:
 
     assert submit_response.status_code == 200
     assert submit_response.json()["item"] is None
+
+
+def test_feedback_summary_reports_progress_since_last_retraining(
+    tmp_path: Path,
+) -> None:
+    feedback_path = tmp_path / "feedback.db"
+    audit_path = tmp_path / "audit.db"
+    store = control_plane.FeedbackStore(feedback_path)
+    old_item = store.add_uncertain("قديم", "negative", 0.4)
+    store.review(old_item, correct=True)
+    store.mark_retraining_succeeded(old_item, None)
+    new_item = store.add_uncertain("جديد", "negative", 0.4)
+    store.review(new_item, correct=True)
+    control_plane.FEEDBACK_DB = feedback_path
+    control_plane.AUDIT_DB = audit_path
+
+    summary = control_plane._feedback_summary()
+
+    assert summary["counts"] == {"negative": 1, "neutral": 0, "positive": 0}
+    assert summary["lifetime_counts"] == {
+        "negative": 2,
+        "neutral": 0,
+        "positive": 0,
+    }

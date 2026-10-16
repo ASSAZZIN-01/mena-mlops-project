@@ -117,7 +117,7 @@ function renderFeedback() {
       <div class="progress-caption"><span>${reviewed + confusing} of ${suspected} triaged</span><span>${counts[label] || 0} / ${thresholds[label]} validated for retraining</span></div>
     </article>`;
   }).join("");
-  const readinessDescription = "Validated feedback examples are the human-reviewed labels consumed by the retraining gate. The number shown below is how many more validated examples are needed for the next scheduled or manually triggered retraining run.";
+  const readinessDescription = "This is progress since the last successful retraining checkpoint, not lifetime feedback. Each validated example moves its class toward the next scheduled or manually triggered Airflow retraining run. The remaining number is how many more validated examples that class needs.";
   $("#view-feedback").innerHTML = `<article class="panel feedback-guidance"><h2>How feedback moves the model forward</h2>
     <p>Every prediction is recorded by the inference service. Low-confidence predictions enter the suspected queue for human review. Reviewed labels count toward retraining; confusing/deferred items remain visible but do not count toward the retraining gate.</p>
     <div class="feedback-legend"><span><i class="legend-dot reviewed"></i>Reviewed</span><span><i class="legend-dot confusing"></i>Confusing / deferred</span><span><i class="legend-dot pending"></i>Pending</span></div>
