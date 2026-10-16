@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from mena_mlops.feedback import FeedbackStore
+from mena_mlops.feedback import FeedbackItem, FeedbackStore
 from mena_mlops.release_registry import ReleaseRegistry
 
 PROJECT_ROOT = Path(os.getenv("MENA_PROJECT_ROOT", Path.cwd()))
@@ -172,15 +172,28 @@ def reviewer_next() -> dict[str, object]:
     store = FeedbackStore(FEEDBACK_DB)
     item = store.next_pending()
     summary = _feedback_summary()
+    pending_items = store.pending_items()
+    reviewed_items = store.reviewed_items()
+    def serialize(entry: FeedbackItem) -> dict[str, object]:
+        return {
+            "id": entry.id,
+            "text": entry.text,
+            "predicted_label": entry.predicted_label,
+            "confidence": entry.confidence,
+            "reviewed_label": entry.reviewed_label,
+            "review_status": entry.review_status,
+        }
     if item is None:
-        return {"item": None, "queue_position": 0, "queue_total": 0, "summary": summary}
+        return {
+            "item": None,
+            "queue_position": 0,
+            "queue_total": 0,
+            "pending_items": [],
+            "reviewed_items": [serialize(entry) for entry in reviewed_items],
+            "summary": summary,
+        }
     pending = summary.get("annotation", {})
     class_summary = pending.get(item.predicted_label, {})
-    queue_total = sum(
-        int(values.get("pending", 0))
-        for values in pending.values()
-        if isinstance(values, dict)
-    )
     return {
         "item": {
             "id": item.id,
@@ -189,7 +202,9 @@ def reviewer_next() -> dict[str, object]:
             "confidence": item.confidence,
         },
         "queue_position": 1,
-        "queue_total": queue_total,
+        "queue_total": len(pending_items),
+        "pending_items": [serialize(entry) for entry in pending_items],
+        "reviewed_items": [serialize(entry) for entry in reviewed_items],
         "class_summary": class_summary,
         "summary": summary,
     }

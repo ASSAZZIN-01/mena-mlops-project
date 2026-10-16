@@ -2,6 +2,7 @@ const $ = (selector) => document.querySelector(selector);
 const labels = ["negative", "neutral", "positive"];
 const state = {
   history: [],
+  pendingItems: [],
   nextItem: null,
   current: null,
   currentIsHistory: false,
@@ -61,12 +62,18 @@ function renderClasses(summary) {
 function renderNavigation() {
   const index = state.currentIsHistory
     ? state.history.findIndex((item) => item.id === state.current.id)
-    : state.history.length;
+    : state.pendingItems.findIndex((item) => item.id === state.current.id);
   const navigationBlocked = state.editing;
-  const previousDisabled = navigationBlocked || index <= 0;
-  const nextDisabled = state.currentIsHistory
-    ? navigationBlocked || (!state.nextItem && index >= state.history.length - 1)
-    : true;
+  const previousDisabled = navigationBlocked || (
+    state.currentIsHistory
+      ? index <= 0
+      : index <= 0 && state.history.length === 0
+  );
+  const nextDisabled = navigationBlocked || (
+    state.currentIsHistory
+      ? index >= state.history.length - 1 && state.pendingItems.length === 0
+      : index >= state.pendingItems.length - 1
+  );
   return `<div class="review-navigation">
     <button id="previous-item" class="button button-secondary" ${previousDisabled ? "disabled" : ""}>← Previous</button>
     <span class="muted">${state.currentIsHistory ? `Reviewed item ${index + 1} of ${state.history.length}` : "Current pending item"}</span>
@@ -108,7 +115,7 @@ function renderItem(data) {
   const classSummary = data.class_summary || {};
   const queueText = state.currentIsHistory
     ? `Reviewed item ${state.history.findIndex((entry) => entry.id === item.id) + 1} of ${state.history.length}`
-    : `Queue 1 of ${data.queue_total}`;
+    : `Queue ${state.pendingItems.findIndex((entry) => entry.id === item.id) + 1} of ${state.pendingItems.length}`;
   $("#reviewer-item").innerHTML = `
     ${renderNavigation()}
     <div class="review-meta"><span class="status ${state.currentIsHistory ? "status-approved" : "status-training"}">${queueText}</span><span class="muted">Review ID ${item.id}</span></div>
@@ -119,24 +126,23 @@ function renderItem(data) {
       <div><span class="label">${escapeHtml(item.predicted_label)} pending</span><strong>${classSummary.pending || 0}</strong></div>
     </div>
     <div class="decision-panel">${renderDecisionButtons(item)}</div>`;
-  $("#previous-item").addEventListener("click", () => showHistory(
-    state.history[state.history.findIndex((entry) => entry.id === item.id) - 1]
-  ));
+  $("#previous-item").addEventListener("click", () => {
+    if (state.currentIsHistory) {
+      showHistory(state.history[state.history.findIndex((entry) => entry.id === item.id) - 1]);
+    } else {
+      const index = state.pendingItems.findIndex((entry) => entry.id === item.id);
+      if (index > 0) showPending(state.pendingItems[index - 1]);
+      else showHistory(state.history[state.history.length - 1]);
+    }
+  });
   $("#next-item").addEventListener("click", () => {
-    const index = state.history.findIndex((entry) => entry.id === item.id);
-    if (state.currentIsHistory && index < state.history.length - 1) {
-      showHistory(state.history[index + 1]);
-    } else if (state.currentIsHistory && index === state.history.length - 1) {
-      state.current = state.nextItem;
-      state.currentIsHistory = false;
-      state.editing = false;
-      state.selectedDecision = null;
-      renderItem({
-        item: state.nextItem,
-        queue_total: state.nextItem ? 1 : 0,
-        summary: window.reviewerSummary,
-        class_summary: {},
-      });
+    if (state.currentIsHistory) {
+      const index = state.history.findIndex((entry) => entry.id === item.id);
+      if (index < state.history.length - 1) showHistory(state.history[index + 1]);
+      else showPending(state.pendingItems[0]);
+    } else {
+      const index = state.pendingItems.findIndex((entry) => entry.id === item.id);
+      showPending(state.pendingItems[index + 1]);
     }
   });
   $("#fix-item")?.addEventListener("click", () => {
@@ -170,6 +176,20 @@ function showHistory(item) {
   });
 }
 
+function showPending(item) {
+  if (!item) return;
+  state.current = item;
+  state.currentIsHistory = false;
+  state.editing = false;
+  state.selectedDecision = null;
+  renderItem({
+    item,
+    queue_total: state.pendingItems.length,
+    summary: window.reviewerSummary,
+    class_summary: {},
+  });
+}
+
 async function submit(decision, itemId, correctedLabel, revise) {
   try {
     $("#reviewer-alerts").innerHTML = "";
@@ -186,6 +206,7 @@ async function submit(decision, itemId, correctedLabel, revise) {
     const existing = state.history.findIndex((item) => item.id === completed.id);
     if (existing >= 0) state.history[existing] = completed;
     else state.history.push(completed);
+    state.pendingItems = result.pending_items;
     state.nextItem = result.item;
     state.current = result.item;
     state.currentIsHistory = false;
@@ -202,6 +223,8 @@ async function refresh() {
   try {
     const result = await getJson("/api/reviewer/next");
     window.reviewerSummary = result.summary;
+    state.history = result.reviewed_items;
+    state.pendingItems = result.pending_items;
     state.nextItem = result.item;
     state.current = result.item;
     state.currentIsHistory = false;

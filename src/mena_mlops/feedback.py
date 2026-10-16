@@ -170,6 +170,36 @@ class FeedbackStore:
             ).fetchone()
         return FeedbackItem(**dict(row)) if row else None
 
+    def pending_items(self) -> list[FeedbackItem]:
+        """Return all pending items in queue order."""
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, text, predicted_label, confidence,
+                       reviewed_label, reviewed_at, review_status
+                FROM feedback
+                WHERE reviewed_label IS NULL AND review_status = 'pending'
+                ORDER BY id
+                """
+            ).fetchall()
+        return [FeedbackItem(**dict(row)) for row in rows]
+
+    def reviewed_items(self) -> list[FeedbackItem]:
+        """Return completed annotations in review order."""
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, text, predicted_label, confidence,
+                       reviewed_label, reviewed_at, review_status
+                FROM feedback
+                WHERE review_status != 'pending'
+                ORDER BY id
+                """
+            ).fetchall()
+        return [FeedbackItem(**dict(row)) for row in rows]
+
     def review(
         self,
         item_id: int,
