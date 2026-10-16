@@ -228,6 +228,7 @@ def main() -> None:
     registry.start_release(
         job_id,
         trigger="manual" if args.manual else "automatic",
+        vertex_job_id=job_id,
         payload={
             "feedback_triggered": feedback_ready,
             "drift_triggered": drift_ready,

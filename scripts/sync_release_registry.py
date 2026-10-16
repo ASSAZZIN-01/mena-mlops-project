@@ -43,7 +43,11 @@ def main() -> None:
         raise ValueError("decision URI does not contain a release ID")
     release_id = parts[-3]
     registry = ReleaseRegistry(args.registry)
-    registry.start_release(release_id, trigger="imported")
+    registry.start_release(
+        release_id,
+        trigger="imported",
+        vertex_job_id=release_id,
+    )
     registry.record_decision(
         release_id,
         decision_uri=args.decision,
