@@ -178,3 +178,19 @@ def test_attempt_and_deployment_watermarks_are_independent(tmp_path: Path) -> No
         reviewed_after=deployed.last_reviewed_at,
     ) == {"negative": 0, "neutral": 0, "positive": 1}
     assert second_id > first_id
+
+
+def test_revise_updates_existing_annotation_without_duplicate_feedback(
+    tmp_path: Path,
+) -> None:
+    store = FeedbackStore(tmp_path / "feedback.db")
+    item_id = store.add_uncertain("نص قابل للتصحيح", "negative", 0.5)
+    store.review(item_id, correct=True)
+
+    store.revise(item_id, correct=False, corrected_label="positive")
+
+    item = store.get_item(item_id)
+    assert item.id == item_id
+    assert item.reviewed_label == "positive"
+    assert item.review_status == "validated"
+    assert store.next_pending() is None

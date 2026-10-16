@@ -48,6 +48,7 @@ class ReviewSubmission(BaseModel):
     item_id: int
     decision: str
     corrected_label: str | None = None
+    revise: bool = False
 
 if STATIC_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
@@ -198,21 +199,46 @@ def reviewer_next() -> dict[str, object]:
 def reviewer_submit(submission: ReviewSubmission) -> dict[str, object]:
     store = FeedbackStore(FEEDBACK_DB)
     try:
-        if submission.decision == "correct":
-            store.review(submission.item_id, correct=True)
-        elif submission.decision == "wrong":
-            store.review(
-                submission.item_id,
-                correct=False,
-                corrected_label=submission.corrected_label,
-            )
-        elif submission.decision == "defer":
-            store.defer(submission.item_id)
+        item = store.get_item(submission.item_id)
+        if submission.revise:
+            if submission.decision == "correct":
+                store.revise(submission.item_id, correct=True)
+            elif submission.decision == "wrong":
+                store.revise(
+                    submission.item_id,
+                    correct=False,
+                    corrected_label=submission.corrected_label,
+                )
+            elif submission.decision == "defer":
+                store.revise(submission.item_id, correct=False, defer=True)
+            else:
+                raise ValueError("decision must be correct, wrong, or defer")
         else:
-            raise ValueError("decision must be correct, wrong, or defer")
+            if submission.decision == "correct":
+                store.review(submission.item_id, correct=True)
+            elif submission.decision == "wrong":
+                store.review(
+                    submission.item_id,
+                    correct=False,
+                    corrected_label=submission.corrected_label,
+                )
+            elif submission.decision == "defer":
+                store.defer(submission.item_id)
+            else:
+                raise ValueError("decision must be correct, wrong, or defer")
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return reviewer_next()
+    result = reviewer_next()
+    reviewed_item = store.get_item(item.id)
+    result["completed_item"] = {
+        "id": reviewed_item.id,
+        "text": reviewed_item.text,
+        "predicted_label": reviewed_item.predicted_label,
+        "confidence": reviewed_item.confidence,
+        "reviewed_label": reviewed_item.reviewed_label,
+        "review_status": reviewed_item.review_status,
+    }
+    return result
 
 
 @app.get("/api/deployments")

@@ -205,6 +205,44 @@ class FeedbackStore:
                 (datetime.now(UTC).isoformat(), item_id),
             )
 
+    def revise(
+        self,
+        item_id: int,
+        correct: bool,
+        corrected_label: str | None = None,
+        defer: bool = False,
+    ) -> None:
+        """Replace an existing annotation without creating another feedback row."""
+
+        item = self._get(item_id)
+        if defer:
+            reviewed_label = None
+            status = "deferred"
+        else:
+            reviewed_label = item.predicted_label if correct else corrected_label
+            if reviewed_label not in LABELS:
+                raise ValueError("an incorrect review requires a valid corrected label")
+            status = "validated"
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE feedback
+                SET reviewed_label = ?, reviewed_at = ?, review_status = ?
+                WHERE id = ?
+                """,
+                (
+                    reviewed_label,
+                    datetime.now(UTC).isoformat(),
+                    status,
+                    item_id,
+                ),
+            )
+
+    def get_item(self, item_id: int) -> FeedbackItem:
+        """Return one feedback item by ID."""
+
+        return self._get(item_id)
+
     def counts(self) -> dict[str, int]:
         """Count reviewed examples by their validated label."""
 

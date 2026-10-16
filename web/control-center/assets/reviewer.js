@@ -1,5 +1,13 @@
 const $ = (selector) => document.querySelector(selector);
 const labels = ["negative", "neutral", "positive"];
+const state = {
+  history: [],
+  nextItem: null,
+  current: null,
+  currentIsHistory: false,
+  editing: false,
+  selectedDecision: null,
+};
 const escapeHtml = (value) => String(value ?? "")
   .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -17,22 +25,23 @@ function showError(error) {
   $("#reviewer-alerts").innerHTML = `<div class="alert">${escapeHtml(error.message)}</div>`;
 }
 
-function renderSummary(summary) {
-  const annotation = summary.annotation || {};
+function renderProgress(summary) {
   const counts = summary.counts || {};
-  const deploymentCounts = summary.deployment_counts || {};
   const thresholds = summary.thresholds || {};
-  const pending = labels.reduce((total, label) => total + Number(annotation[label]?.pending || 0), 0);
-  const reviewed = labels.reduce((total, label) => total + Number(annotation[label]?.reviewed || 0), 0);
-  $("#reviewer-summary").innerHTML = [
-    ["Pending queue", pending, "Items waiting for a human decision"],
-    ["Reviewed", reviewed, "Validated labels saved"],
-    ["Next retraining progress", labels.map((label) => `${label}: ${counts[label] || 0}/${thresholds[label] || 0}`).join(" · "), "Validated since the last successful retraining"],
-    ["Awaiting deployment", labels.map((label) => `${label}: ${deploymentCounts[label] || 0}`).join(" · "), "Feedback since last successful deployment"],
-    ["Retraining gate", summary.ready ? "Ready" : "Collecting", "Validated labels since last attempt"],
-  ].map(([label, value, detail]) =>
-    `<article class="card"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div><div class="detail">${escapeHtml(detail)}</div></article>`
-  ).join("");
+  $("#reviewer-progress").innerHTML = `<div class="progress-heading">
+    <div><p class="eyebrow">Feedback retraining readiness</p><h2>Progress toward the next trigger</h2></div>
+    <span class="muted">${summary.ready ? "Threshold reached" : "Validated reviews still needed"}</span>
+  </div>
+  <div class="reviewer-progress-grid">${labels.map((label) => {
+    const count = Number(counts[label] || 0);
+    const threshold = Number(thresholds[label] || 1);
+    const remaining = Math.max(0, threshold - count);
+    return `<div class="reviewer-progress-item">
+      <div><strong>${escapeHtml(label)}</strong><span>${remaining} remaining</span></div>
+      <div class="progress"><span style="width:${Math.min(100, count / threshold * 100)}%"></span></div>
+      <small class="muted">${count} / ${threshold} validated since the last attempt</small>
+    </div>`;
+  }).join("")}</div>`;
 }
 
 function renderClasses(summary) {
@@ -49,60 +58,141 @@ function renderClasses(summary) {
   }).join("");
 }
 
+function renderNavigation() {
+  const index = state.currentIsHistory
+    ? state.history.findIndex((item) => item.id === state.current.id)
+    : state.history.length;
+  const navigationBlocked = state.editing;
+  const previousDisabled = navigationBlocked || index <= 0;
+  const nextDisabled = state.currentIsHistory
+    ? navigationBlocked || (!state.nextItem && index >= state.history.length - 1)
+    : true;
+  return `<div class="review-navigation">
+    <button id="previous-item" class="button button-secondary" ${previousDisabled ? "disabled" : ""}>← Previous</button>
+    <span class="muted">${state.currentIsHistory ? `Reviewed item ${index + 1} of ${state.history.length}` : "Current pending item"}</span>
+    <button id="next-item" class="button button-secondary" ${nextDisabled ? "disabled" : ""}>Next →</button>
+  </div>`;
+}
+
+function renderDecisionButtons(item) {
+  const readOnly = state.currentIsHistory && !state.editing;
+  const selected = state.selectedDecision;
+  const selectedLabel = item.review_status === "validated"
+    ? (item.reviewed_label === item.predicted_label ? "Correct" : `Wrong → ${item.reviewed_label}`)
+    : "I don't know";
+  if (readOnly) {
+    return `<div class="reviewed-choice"><span class="decision-pill decision-${item.review_status}">${escapeHtml(selectedLabel)}</span>
+      <button id="fix-item" class="button button-secondary">Fix it</button></div>`;
+  }
+  return `<p class="label">Is this prediction correct?</p>
+    <div class="decision-actions">
+      <button class="button decision-button decision-correct ${selected === "correct" ? "selected" : ""}" data-decision="correct">Correct</button>
+      <button class="button decision-button decision-wrong ${selected === "wrong" ? "selected" : ""}" data-decision="wrong">Wrong</button>
+      <button class="button decision-button decision-defer ${selected === "defer" ? "selected" : ""}" data-decision="defer">I don't know</button>
+    </div>
+    ${selected === "wrong" ? `<div class="correction-field">
+      <label class="label" for="corrected-label">Correct sentiment</label>
+      <select id="corrected-label">${labels.map((label) => `<option value="${label}" ${label === item.reviewed_label ? "selected" : ""}>${label}</option>`).join("")}</select>
+    </div>` : ""}
+    <button id="confirm-review" class="button button-primary" ${selected ? "" : "disabled"}>Confirm review</button>`;
+}
+
 function renderItem(data) {
-  renderSummary(data.summary);
+  renderProgress(data.summary);
   renderClasses(data.summary);
-  const item = data.item;
+  const item = state.current;
   if (!item) {
     $("#reviewer-item").innerHTML = `<div class="empty-state"><h3>Queue complete</h3><p class="muted">There are no pending suspected predictions to review.</p></div>`;
     return;
   }
   const classSummary = data.class_summary || {};
+  const queueText = state.currentIsHistory
+    ? `Reviewed item ${state.history.findIndex((entry) => entry.id === item.id) + 1} of ${state.history.length}`
+    : `Queue 1 of ${data.queue_total}`;
   $("#reviewer-item").innerHTML = `
-    <div class="review-meta">
-      <span class="status status-training">Queue ${data.queue_position} of ${data.queue_total}</span>
-      <span class="muted">Review ID ${item.id}</span>
-    </div>
+    ${renderNavigation()}
+    <div class="review-meta"><span class="status ${state.currentIsHistory ? "status-approved" : "status-training"}">${queueText}</span><span class="muted">Review ID ${item.id}</span></div>
     <blockquote>${escapeHtml(item.text)}</blockquote>
     <div class="review-facts">
       <div><span class="label">Model prediction</span><strong>${escapeHtml(item.predicted_label)}</strong></div>
       <div><span class="label">Confidence</span><strong>${(Number(item.confidence) * 100).toFixed(1)}%</strong></div>
       <div><span class="label">${escapeHtml(item.predicted_label)} pending</span><strong>${classSummary.pending || 0}</strong></div>
     </div>
-    <div class="decision-panel">
-      <p class="label">Is this prediction correct?</p>
-      <div class="decision-actions">
-        <button class="button decision-button button-primary" data-decision="correct">Correct</button>
-        <button class="button decision-button button-secondary" data-decision="wrong">Wrong</button>
-        <button class="button decision-button button-secondary" data-decision="defer">I don't know</button>
-      </div>
-      <div id="correction" class="hidden correction-field">
-        <label class="label" for="corrected-label">Correct sentiment</label>
-        <select id="corrected-label">${labels.map((label) => `<option value="${label}">${label}</option>`).join("")}</select>
-        <button id="save-correction" class="button button-primary">Save corrected label</button>
-      </div>
-    </div>`;
+    <div class="decision-panel">${renderDecisionButtons(item)}</div>`;
+  $("#previous-item").addEventListener("click", () => showHistory(
+    state.history[state.history.findIndex((entry) => entry.id === item.id) - 1]
+  ));
+  $("#next-item").addEventListener("click", () => {
+    const index = state.history.findIndex((entry) => entry.id === item.id);
+    if (state.currentIsHistory && index < state.history.length - 1) {
+      showHistory(state.history[index + 1]);
+    } else if (state.currentIsHistory && index === state.history.length - 1) {
+      state.current = state.nextItem;
+      state.currentIsHistory = false;
+      state.editing = false;
+      state.selectedDecision = null;
+      renderItem({
+        item: state.nextItem,
+        queue_total: state.nextItem ? 1 : 0,
+        summary: window.reviewerSummary,
+        class_summary: {},
+      });
+    }
+  });
+  $("#fix-item")?.addEventListener("click", () => {
+    state.editing = true;
+    state.selectedDecision = null;
+    renderItem(data);
+  });
   document.querySelectorAll(".decision-button").forEach((button) => {
     button.addEventListener("click", () => {
-      if (button.dataset.decision === "wrong") {
-        $("#correction").classList.remove("hidden");
-      } else {
-        submit(button.dataset.decision, item.id);
-      }
+      state.selectedDecision = button.dataset.decision;
+      renderItem(data);
     });
   });
-  $("#save-correction").addEventListener("click", () =>
-    submit("wrong", item.id, $("#corrected-label").value)
-  );
+  $("#confirm-review")?.addEventListener("click", () => {
+    const corrected = $("#corrected-label")?.value || null;
+    submit(state.selectedDecision, item.id, corrected, state.currentIsHistory);
+  });
 }
 
-async function submit(decision, itemId, correctedLabel = null) {
+function showHistory(item) {
+  if (!item) return;
+  state.current = item;
+  state.currentIsHistory = true;
+  state.editing = false;
+  state.selectedDecision = null;
+  renderItem({
+    item,
+    queue_total: state.nextItem ? 1 : 0,
+    summary: window.reviewerSummary,
+    class_summary: {},
+  });
+}
+
+async function submit(decision, itemId, correctedLabel, revise) {
   try {
     $("#reviewer-alerts").innerHTML = "";
-    renderItem(await getJson("/api/reviewer/submit", {
+    const result = await getJson("/api/reviewer/submit", {
       method: "POST",
-      body: JSON.stringify({item_id: itemId, decision, corrected_label: correctedLabel}),
-    }));
+      body: JSON.stringify({
+        item_id: itemId,
+        decision,
+        corrected_label: correctedLabel,
+        revise,
+      }),
+    });
+    const completed = result.completed_item;
+    const existing = state.history.findIndex((item) => item.id === completed.id);
+    if (existing >= 0) state.history[existing] = completed;
+    else state.history.push(completed);
+    state.nextItem = result.item;
+    state.current = result.item;
+    state.currentIsHistory = false;
+    state.editing = false;
+    state.selectedDecision = null;
+    window.reviewerSummary = result.summary;
+    renderItem(result);
   } catch (error) {
     showError(error);
   }
@@ -110,7 +200,14 @@ async function submit(decision, itemId, correctedLabel = null) {
 
 async function refresh() {
   try {
-    renderItem(await getJson("/api/reviewer/next"));
+    const result = await getJson("/api/reviewer/next");
+    window.reviewerSummary = result.summary;
+    state.nextItem = result.item;
+    state.current = result.item;
+    state.currentIsHistory = false;
+    state.editing = false;
+    state.selectedDecision = null;
+    renderItem(result);
   } catch (error) {
     showError(error);
   }
