@@ -234,6 +234,6 @@ class SentimentService:
     @bentoml.api
     def health(self) -> HealthResponse:
         return HealthResponse(
-            status="ok",
+            status="healthy",
             model_version=self.predictor.model_version,
         )
