@@ -130,6 +130,9 @@ services:
       MODEL_API_URL: http://nginx:8080
       PROMETHEUS_URL: http://prometheus:9090
       MLFLOW_URL: http://mlflow:5000
+      AIRFLOW_INTERNAL_URL: http://airflow:8080
+      PROMETHEUS_PUBLIC_URL: http://localhost:9090
+      MLFLOW_PUBLIC_URL: http://localhost:5000
       AIRFLOW_URL: http://localhost:8081
       GRAFANA_URL: http://localhost:3000
       FEEDBACK_URL: http://localhost:8502

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from urllib.error import URLError
@@ -81,13 +82,20 @@ def overview() -> dict[str, object]:
             "mlflow": _health(
                 os.getenv("MLFLOW_URL", "http://mlflow:5000") + "/health"
             ),
+            "airflow": _health(
+                os.getenv("AIRFLOW_INTERNAL_URL", "http://airflow:8080")
+                + "/health"
+            ),
         },
         "links": {
             "airflow": os.getenv("AIRFLOW_URL", "http://localhost:8081"),
             "grafana": os.getenv("GRAFANA_URL", "http://localhost:3000"),
-            "mlflow": os.getenv("MLFLOW_URL", "http://localhost:5000"),
+            "mlflow": os.getenv("MLFLOW_PUBLIC_URL", "http://localhost:5000"),
             "feedback": os.getenv("FEEDBACK_URL", "http://localhost:8502"),
-            "prometheus": os.getenv("PROMETHEUS_URL", "http://localhost:9090"),
+            "prometheus": os.getenv(
+                "PROMETHEUS_PUBLIC_URL",
+                "http://localhost:9090",
+            ),
         },
     }
 
@@ -108,6 +116,34 @@ def release(release_id: str) -> dict[str, object]:
 @app.get("/api/feedback")
 def feedback() -> dict[str, object]:
     return _feedback_summary()
+
+
+@app.get("/api/deployments")
+def deployments() -> dict[str, object]:
+    releases = registry.list_releases()
+    baseline_path = PROJECT_ROOT / "reports" / "retraining" / "deployed_baseline.json"
+    baseline: dict[str, object] | None = None
+    if baseline_path.is_file():
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    return {
+        "current": baseline,
+        "history": [
+            release
+            for release in releases
+            if release["deployment_status"] != "not_started"
+        ],
+    }
+
+
+@app.get("/api/models")
+def models() -> dict[str, object]:
+    baseline_path = PROJECT_ROOT / "reports" / "retraining" / "deployed_baseline.json"
+    if not baseline_path.is_file():
+        return {"current": None, "candidates": registry.list_releases()}
+    return {
+        "current": json.loads(baseline_path.read_text(encoding="utf-8")),
+        "candidates": registry.list_releases(),
+    }
 
 
 @app.get("/api/health")

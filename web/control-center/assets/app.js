@@ -70,6 +70,23 @@ function renderFeedback() {
   </article>`;
 }
 
+async function renderDeployments() {
+  const data = await getJson("/api/deployments");
+  const current = data.current;
+  $("#view-deployments").innerHTML = `<article class="panel"><h2>Current deployment</h2>
+    ${current ? `<div class="two-col"><div><p class="eyebrow">Active model</p><h2>${escapeHtml(current.model_id || "unknown")}</h2><p class="muted">Variant: ${escapeHtml(current.selected_variant || "unknown")}</p></div><div><p class="eyebrow">Performance baseline</p><p>Macro-F1: <strong>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</strong></p><p>Latency: <strong>${Number(current.latency?.mean_ms || 0).toFixed(2)} ms</strong></p><p>Throughput: <strong>${Number(current.latency?.throughput_rps || 0).toFixed(2)} req/s</strong></p></div></div>` : '<p class="empty">No deployed baseline is recorded.</p>'}
+  </article><article class="panel"><h2>Release deployment history</h2>
+    ${data.history.length ? data.history.map((release) => `<div class="release-row" onclick="showRelease('${escapeHtml(release.release_id)}')"><div><strong>${escapeHtml(release.release_id)}</strong><div class="muted">${formatDate(release.completed_at)}</div></div><div>${statusBadge(release.status)}</div><div>${statusBadge(release.deployment_status)}</div><div>View →</div></div>`).join("") : '<p class="empty">No deployment attempts recorded.</p>'}</article>`;
+}
+
+async function renderModels() {
+  const data = await getJson("/api/models");
+  const current = data.current;
+  $("#view-models").innerHTML = `<article class="panel"><h2>Model identity</h2>
+    ${current ? `<table><tbody><tr><th>Model ID</th><td>${escapeHtml(current.model_id)}</td></tr><tr><th>Variant</th><td>${escapeHtml(current.selected_variant)}</td></tr><tr><th>Backend</th><td>${escapeHtml(current.hardware?.backend)} / ${escapeHtml(current.hardware?.provider)}</td></tr><tr><th>Macro-F1</th><td>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</td></tr></tbody></table>` : '<p class="empty">No model identity baseline found.</p>'}
+  </article><article class="panel"><h2>Candidate history</h2><p class="muted">Use Retraining & releases to inspect every gate and its evidence. This registry currently contains ${data.candidates.length} release record(s).</p></article>`;
+}
+
 function renderLinks() {
   const links = state.overview.links || {};
   $("#view-links").innerHTML = `<article class="panel"><h2>Specialist tools</h2><table><thead><tr><th>Tool</th><th>Purpose</th><th>Open</th></tr></thead><tbody>
@@ -118,6 +135,7 @@ async function refresh() {
     state.overview = await getJson("/api/overview");
     state.releases = await getJson("/api/releases");
     renderSummary(); renderOverview(); renderFeedback(); renderLinks(); renderReleaseList();
+    await renderDeployments(); await renderModels();
     $("#updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
     $("#alerts").innerHTML = "";
   } catch (error) { showError(error); }
