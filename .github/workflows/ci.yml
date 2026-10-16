@@ -135,7 +135,7 @@ jobs:
           endpoints=(
             "gateway|http://localhost:8080/health"
             "dashboard|http://localhost:8501/"
-            "control-plane|http://localhost:8503/health"
+            "control-plane|http://localhost:8503/api/health"
             "reviewer|http://localhost:8503/reviewer"
             "grafana|http://localhost:3000/api/health"
             "mlflow|http://localhost:5000/health"
