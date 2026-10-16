@@ -76,3 +76,22 @@ def test_failed_retraining_does_not_advance_checkpoint(tmp_path: Path) -> None:
     assert checkpoint.last_feedback_id == 0
     assert store.counts_since(checkpoint.last_feedback_id)["positive"] == 1
     assert store.latest_reviewed_id() == reviewed_id
+
+
+def test_late_review_of_older_item_is_counted_after_checkpoint(
+    tmp_path: Path,
+) -> None:
+    store = FeedbackStore(tmp_path / "feedback.db")
+    old_item = store.add_uncertain("نص قديم", "positive", 0.5)
+    store.add_uncertain("نص آخر", "neutral", 0.5)
+    store.review(2, correct=True)
+    checkpoint_time = store.latest_reviewed_at()
+    store.mark_retraining_succeeded(2, None, reviewed_at=checkpoint_time)
+
+    store.review(old_item, correct=True)
+    checkpoint = store.retraining_checkpoint()
+
+    assert store.counts_since(
+        checkpoint.last_feedback_id,
+        reviewed_after=checkpoint.last_reviewed_at,
+    ) == {"negative": 0, "neutral": 0, "positive": 1}

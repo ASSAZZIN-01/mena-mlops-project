@@ -29,6 +29,7 @@ class RetrainingCheckpoint:
 
     last_feedback_id: int
     last_drift_fingerprint: str | None
+    last_reviewed_at: str | None = None
 
 
 class FeedbackStore:
@@ -75,6 +76,24 @@ class FeedbackStore:
                 )
                 """
             )
+            columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(retraining_state)")
+            }
+            if "last_reviewed_at" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE retraining_state
+                    ADD COLUMN last_reviewed_at TEXT
+                    """
+                )
+                connection.execute(
+                    """
+                    UPDATE retraining_state
+                    SET last_reviewed_at = updated_at
+                    WHERE last_reviewed_at IS NULL
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -180,19 +199,34 @@ class FeedbackStore:
             for label in LABELS
         }
 
-    def counts_since(self, feedback_id: int) -> dict[str, int]:
-        """Count reviewed examples newer than a successful retraining."""
+    def counts_since(
+        self,
+        feedback_id: int,
+        reviewed_after: str | None = None,
+    ) -> dict[str, int]:
+        """Count reviewed examples added after a successful retraining."""
 
         with self._connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT reviewed_label, COUNT(*) AS count
-                FROM feedback
-                WHERE reviewed_label IS NOT NULL AND id > ?
-                GROUP BY reviewed_label
-                """,
-                (feedback_id,),
-            ).fetchall()
+            if reviewed_after is None:
+                rows = connection.execute(
+                    """
+                    SELECT reviewed_label, COUNT(*) AS count
+                    FROM feedback
+                    WHERE reviewed_label IS NOT NULL AND id > ?
+                    GROUP BY reviewed_label
+                    """,
+                    (feedback_id,),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT reviewed_label, COUNT(*) AS count
+                    FROM feedback
+                    WHERE reviewed_label IS NOT NULL AND reviewed_at > ?
+                    GROUP BY reviewed_label
+                    """,
+                    (reviewed_after,),
+                ).fetchall()
         return {
             label: next(
                 (
@@ -220,7 +254,8 @@ class FeedbackStore:
         with self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT last_feedback_id, last_drift_fingerprint
+                SELECT last_feedback_id, last_drift_fingerprint,
+                       last_reviewed_at
                 FROM retraining_state
                 WHERE id = 1
                 """
@@ -230,6 +265,7 @@ class FeedbackStore:
         return RetrainingCheckpoint(
             last_feedback_id=int(row["last_feedback_id"]),
             last_drift_fingerprint=row["last_drift_fingerprint"],
+            last_reviewed_at=row["last_reviewed_at"],
         )
 
     def latest_reviewed_id(self) -> int:
@@ -245,10 +281,24 @@ class FeedbackStore:
             ).fetchone()[0]
         return int(value)
 
+    def latest_reviewed_at(self) -> str | None:
+        """Return the review timestamp used as the retraining cursor."""
+
+        with self._connect() as connection:
+            value = connection.execute(
+                """
+                SELECT MAX(reviewed_at)
+                FROM feedback
+                WHERE reviewed_label IS NOT NULL
+                """
+            ).fetchone()[0]
+        return str(value) if value is not None else None
+
     def mark_retraining_succeeded(
         self,
         feedback_id: int,
         drift_fingerprint: str | None,
+        reviewed_at: str | None = None,
     ) -> None:
         """Advance the checkpoint after a successful retraining job."""
 
@@ -258,17 +308,20 @@ class FeedbackStore:
             connection.execute(
                 """
                 INSERT INTO retraining_state (
-                    id, last_feedback_id, last_drift_fingerprint, updated_at
+                    id, last_feedback_id, last_drift_fingerprint,
+                    last_reviewed_at, updated_at
                 )
-                VALUES (1, ?, ?, ?)
+                VALUES (1, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     last_feedback_id = excluded.last_feedback_id,
                     last_drift_fingerprint = excluded.last_drift_fingerprint,
+                    last_reviewed_at = excluded.last_reviewed_at,
                     updated_at = excluded.updated_at
                 """,
                 (
                     feedback_id,
                     drift_fingerprint,
+                    reviewed_at or datetime.now(UTC).isoformat(),
                     datetime.now(UTC).isoformat(),
                 ),
             )
@@ -278,23 +331,40 @@ class FeedbackStore:
         path: Path,
         after_id: int = 0,
         through_id: int | None = None,
+        reviewed_after: str | None = None,
+        reviewed_through: str | None = None,
     ) -> int:
         """Export only reviewed examples in a retraining batch."""
 
-        upper_bound = through_id if through_id is not None else 2**63 - 1
         with self._connect() as connection:
-            frame = pd.read_sql_query(
-                """
-                SELECT id, text, reviewed_label AS label
-                FROM feedback
-                WHERE reviewed_label IS NOT NULL
-                  AND id > ?
-                  AND id <= ?
-                ORDER BY id
-                """,
-                connection,
-                params=(after_id, upper_bound),
-            )
+            if reviewed_after is None:
+                upper_bound = through_id if through_id is not None else 2**63 - 1
+                frame = pd.read_sql_query(
+                    """
+                    SELECT id, text, reviewed_label AS label
+                    FROM feedback
+                    WHERE reviewed_label IS NOT NULL
+                      AND id > ?
+                      AND id <= ?
+                    ORDER BY id
+                    """,
+                    connection,
+                    params=(after_id, upper_bound),
+                )
+            else:
+                upper_bound = reviewed_through or datetime.now(UTC).isoformat()
+                frame = pd.read_sql_query(
+                    """
+                    SELECT id, text, reviewed_label AS label
+                    FROM feedback
+                    WHERE reviewed_label IS NOT NULL
+                      AND reviewed_at > ?
+                      AND reviewed_at <= ?
+                    ORDER BY reviewed_at, id
+                    """,
+                    connection,
+                    params=(reviewed_after, upper_bound),
+                )
         frame["source"] = "human_feedback"
         path.parent.mkdir(parents=True, exist_ok=True)
         frame.to_parquet(path, index=False)
