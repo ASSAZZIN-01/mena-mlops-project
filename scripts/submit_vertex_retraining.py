@@ -308,10 +308,14 @@ class tempfile_feedback:
         database: Path,
         after_id: int,
         through_id: int,
+        reviewed_after: str | None = None,
+        reviewed_through: str | None = None,
     ) -> None:
         self.database = database
         self.after_id = after_id
         self.through_id = through_id
+        self.reviewed_after = reviewed_after
+        self.reviewed_through = reviewed_through
         self.path: Path | None = None
 
     def __enter__(self) -> Path:
@@ -324,6 +328,8 @@ class tempfile_feedback:
             self.path,
             after_id=self.after_id,
             through_id=self.through_id,
+            reviewed_after=self.reviewed_after,
+            reviewed_through=self.reviewed_through,
         )
         return self.path
 
