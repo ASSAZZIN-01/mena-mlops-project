@@ -20,7 +20,7 @@ flowchart LR
     O --> E[Monitoring windows]
     E --> A[Airflow scheduled Evidently and PSI]
     A --> G{Drift OR feedback thresholds?}
-    F --> U[Streamlit reviewer]
+    F --> U[Control Center reviewer]
     U --> Q[Retraining thresholds]
     Q --> G
     G -->|yes| V[Vertex GPU retraining]
@@ -30,9 +30,16 @@ flowchart LR
     O --> QG[Quality and optimization gates]
     QG -->|approved artifact| N
     QG -->|rejected| X
+    N --> R[Release registry and production baseline]
+    R --> CC[MLOps Control Center]
+    CC --> U
 ```
 
 The same model artifact supports online HTTP inference, batch inference, and
 Redis Streams inference. Stable/candidate routing is operationally separate
 from model training, which makes rollback a router change rather than a model
-mutation.
+mutation. The Control Center is the operator-facing browser UI for release
+history, gate evidence, deployment state, model identity, feedback readiness,
+and the human reviewer queue. Durable lifecycle records are stored in
+`reports/control-plane/releases.db`; the active serving baseline is stored in
+`reports/retraining/deployed_baseline.json`.

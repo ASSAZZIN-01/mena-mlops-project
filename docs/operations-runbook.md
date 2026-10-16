@@ -99,9 +99,10 @@ This always submits a Vertex T4 job and never trains on the local GPU. The
 automatic `mena_evidently_drift` DAG remains responsible for production
 retraining when PSI/Evidently drift or reviewed-feedback thresholds trigger.
 The manual command uses the selected training YAML unchanged, while the
-automatic retraining path has its own trigger, release, and review-time
-watermark logic. Reviews are counted when they are saved, even if the
-underlying prediction was created before the previous checkpoint.
+automatic retraining path has independent attempt and successful-deployment
+feedback cursors. The attempt cursor prevents duplicate jobs after a rejected
+candidate; the successful-deployment cursor measures feedback not yet
+represented in production.
 
 After manual evaluation and promotion, create the immutable identity bundle
 from the same model, split, and promotion decision:
@@ -135,14 +136,20 @@ macro-F1 and every per-class F1 must be at least the deployed values. Mean
 latency may regress by at most 3%, and throughput may regress by at most 3%.
 Failure of either the quality or deployed-model performance gate rejects the
 release and prevents deployment. The baseline is updated only after a guarded
-deployment and canary complete successfully.
+deployment and canary complete successfully. New baselines retain p50, mean,
+p95, throughput, model-card, release-bundle, and promotion-decision metadata
+when those values are available.
 
 The MLOps Control Center at `http://localhost:8503` is the operator-facing
 release view. It reads the durable registry at
 `reports/control-plane/releases.db` and displays retraining history, gate
 results, exact rejection reasons, deployment status, feedback readiness, and
 service health. Airflow, Grafana, MLflow, Prometheus, and the feedback
-reviewer remain available as specialist drill-down tools.
+reviewer remain available as specialist drill-down tools. The Models view also
+links to Vertex AI Model Registry, MLflow, Airflow, Grafana, and Prometheus.
+The active baseline is marked `ON PROD`; a baseline created before release
+metadata was persisted is shown as an imported production baseline instead of
+being presented as a fabricated historical release.
 
 ## 3.1 Structured lifecycle logs
 

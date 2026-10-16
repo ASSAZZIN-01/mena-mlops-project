@@ -238,7 +238,7 @@ uv run python scripts/promote_candidate.py \
 ```
 
 Automatic Vertex retraining performs the same release checks before the
-retraining watermark is advanced: it evaluates the held-out test set,
+attempt cursor is advanced: it evaluates the held-out test set,
 exports ONNX FP32 and dynamic-INT8 variants, benchmarks their latency, selects
 the fastest variant within the configured quality-loss limit, and compares its
 test metrics with the stable baseline. The Vertex job publishes the variants,
@@ -248,6 +248,11 @@ label quality gate pass; otherwise it is marked `rejected` and is not
 production-ready. The local Nginx canary remains an explicit deployment
 operation so a rejected or unhealthy candidate cannot change production
 traffic automatically.
+
+The feedback store also maintains a successful-deployment cursor. It advances
+only after deployment and canary verification succeed, so the Control Center
+can distinguish feedback used by a training attempt from feedback represented
+by the model currently running in production.
 
 Inspect a decision directly from the Vertex staging bucket:
 
@@ -349,7 +354,7 @@ uv run python scripts/benchmark_optimization.py \
   --output reports/optimization.json
 ```
 
-The benchmark records mean latency, p95 latency, and measured speedup. The
+The benchmark records p50, mean, and p95 latency, plus measured speedup. The
 completed ONNX comparison is documented in
 [`docs/optimization-benchmark.md`](docs/optimization-benchmark.md).
 ### Optimization variants
