@@ -20,6 +20,7 @@ from google.cloud import storage
 
 from mena_mlops.feedback import FeedbackStore
 from mena_mlops.observability import emit_event
+from mena_mlops.release_registry import ReleaseRegistry
 from mena_mlops.retraining import (
     drift_fingerprint,
     drift_triggered,
@@ -216,6 +217,22 @@ def main() -> None:
         f"{args.job_prefix}-%Y%m%d-%H%M%S"
     )
     prefix = f"{staging_bucket}/{job_id}"
+    registry = ReleaseRegistry(
+        Path(
+            os.getenv(
+                "CONTROL_PLANE_DB",
+                "reports/control-plane/releases.db",
+            )
+        )
+    )
+    registry.start_release(
+        job_id,
+        trigger="manual" if args.manual else "automatic",
+        payload={
+            "feedback_triggered": feedback_ready,
+            "drift_triggered": drift_ready,
+        },
+    )
     with tempfile_feedback(
         args.database,
         after_id=checkpoint.last_feedback_id,
@@ -328,12 +345,34 @@ def main() -> None:
         drift_triggered=drift_ready,
         manual=args.manual,
     )
-    _submit_and_wait(job_spec, project, region)
+    try:
+        _submit_and_wait(job_spec, project, region)
+    except Exception as error:
+        registry.record_deployment(
+            job_id,
+            status="training_failed",
+            payload={"error": str(error)},
+        )
+        raise
+    decision_uri = f"{prefix}/release/promotion_decision.json"
     if args.release_decision_output is not None:
         _write_release_decision_uri(
             args.release_decision_output,
             f"{prefix}/release",
         )
+    parsed = urlparse(decision_uri)
+    decision = json.loads(
+        storage.Client()
+        .bucket(parsed.netloc)
+        .blob(parsed.path.lstrip("/"))
+        .download_as_text()
+    )
+    registry.record_decision(
+        job_id,
+        decision_uri=decision_uri,
+        decision=decision,
+        payload={"vertex_job_id": job_id},
+    )
     if not args.manual:
         store.mark_retraining_succeeded(
             feedback_upper_bound,
