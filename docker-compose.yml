@@ -184,6 +184,8 @@ services:
     depends_on:
       postgres-airflow:
         condition: service_healthy
+      pushgateway:
+        condition: service_healthy
     ports:
       - "8081:8080"
     environment:
@@ -202,6 +204,7 @@ services:
       VERTEX_STAGING_BUCKET: ${VERTEX_STAGING_BUCKET:-gs://mena-mlops-project-dvc/vertex-staging}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
       MLFLOW_ARTIFACT_LOCATION: ${MLFLOW_ARTIFACT_LOCATION:-gs://mena-mlops-project-dvc/mlflow}
+      MENA_PROMETHEUS_PUSHGATEWAY_URL: http://pushgateway:9091
       MENA_AUTO_DEPLOY_PROJECT_ROOT: ${MENA_HOST_PROJECT_ROOT:-/home/az-wsl/projects/mena-mlops-project}
       DOCKER_COMPOSE_COMMAND: ${DOCKER_COMPOSE_COMMAND:-docker-compose}
       GOOGLE_APPLICATION_CREDENTIALS: /tmp/mena-gcp-key.json
@@ -272,6 +275,8 @@ services:
         condition: service_healthy
       model-candidate:
         condition: service_healthy
+      pushgateway:
+        condition: service_healthy
     ports:
       - "9090:9090"
     volumes:
@@ -289,6 +294,22 @@ services:
       interval: 10s
       timeout: 5s
       start_period: 15s
+      retries: 12
+
+  pushgateway:
+    image: prom/pushgateway:v1.11.1
+    ports:
+      - "9091:9091"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - --quiet
+        - http://127.0.0.1:9091/-/ready
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
       retries: 12
 
   grafana:

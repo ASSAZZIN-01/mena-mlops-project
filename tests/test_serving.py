@@ -25,7 +25,10 @@ def test_health_reports_loaded_model() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "model_version": "test-v1"}
+    assert response.json() == {
+        "status": "healthy",
+        "model_version": "test-v1",
+    }
 
 
 def test_predict_returns_versioned_probabilities() -> None:

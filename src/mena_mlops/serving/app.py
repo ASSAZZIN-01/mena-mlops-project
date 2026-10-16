@@ -255,7 +255,10 @@ def create_app(predictor: Predictor | None = None) -> FastAPI:
         loaded = app.state.predictor
         if loaded is None:
             raise HTTPException(status_code=503, detail="model is not loaded")
-        return HealthResponse(status="ok", model_version=loaded.model_version)
+        return HealthResponse(
+            status="healthy",
+            model_version=loaded.model_version,
+        )
 
     @app.post("/predict", response_model=PredictionResponse)
     def predict(payload: PredictionRequest, request: Request) -> PredictionResponse:
