@@ -34,6 +34,73 @@ documented in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
 The course-rubric evidence map is in
 [`docs/rubric-evidence.md`](docs/rubric-evidence.md).
 
+## Reviewer quickstart (exactly three commands)
+
+From a clean checkout with Docker and `uv` installed:
+
+```bash
+uv sync --locked
+python scripts/download_model_bundle.py
+docker compose up --build -d
+```
+
+The gateway is then available at `http://localhost:8080`. The model bundle
+command retrieves the public evaluation artifacts only; private credentials
+are still required for DVC, cloud MLflow artifacts, and Vertex workflows.
+
+## Final architecture
+
+```mermaid
+flowchart LR
+    DVC[DVC datasets] --> T[Training and evaluation]
+    T --> M[MLflow tracking and registry]
+    M --> S[BentoML stable]
+    M --> C[BentoML candidate]
+    S --> N[Nginx canary router]
+    C --> N
+    N --> API[HTTP scalar and batch inference]
+    N --> L[Locust load tests]
+    API --> P[Prometheus]
+    P --> G[Grafana and alerts]
+    R[Redis feedback stream] --> W[Inference consumer]
+    W --> U[Control Center reviewer]
+    U --> Q[Feedback thresholds]
+    API --> E[Audit and monitoring windows]
+    E --> A[Airflow Evidently and PSI]
+    A --> G
+    Q --> V[Vertex retraining]
+    A --> V
+    V --> M
+    G --> RR[Quality and release gates]
+    RR --> N
+    N --> RC[Release registry and production baseline]
+    RC --> CC[MLOps Control Center]
+```
+
+This diagram covers the course flow from data/versioning and training through
+registry, optimized serving, canary deployment, monitoring, feedback,
+retraining, and release operations.
+
+## Session changelog
+
+- **Session 1 - reproducible data and training:** DVC data stages, typed
+  training code, locked dependencies, and MLflow lineage.
+- **Session 2 - optimization and serving:** ONNX FP32/INT8 variants, CPU-only
+  BentoML serving, scalar inference, vectorized batch inference, and Locust
+  measurements.
+- **Session 3 - production operations:** Nginx stable/candidate routing,
+  canary weights, rollback, audit provenance, Redis feedback, and reviewer
+  workflows.
+- **Session 4 - monitoring and retraining:** Prometheus/Grafana,
+  Evidently/PSI, Airflow scheduling, feedback thresholds, retraining gates,
+  release registry, and deployment identity.
+- **Session 5 - control and evidence:** MLOps Control Center, model cards,
+  release observability, public health contract, PSI Pushgateway publishing,
+  and submission evidence mapping.
+
+The required peer-review artifact is in
+[`docs/peer-review.md`](docs/peer-review.md).
+
 ## Getting started
 
 The project targets Python 3.11 or newer and uses `uv` for locked,

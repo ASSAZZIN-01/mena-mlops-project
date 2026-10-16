@@ -15,14 +15,31 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Batch inference | `run_batch_inference.py` and dashboard upload | CSV result with generated ID and optional source behavior |
 | Canary deployment | Nginx weights and `scripts/canary.py` | 5%/20% traffic metrics and model-version counts |
 | Rollback | `scripts/canary.py --rollback` | Stable-only traffic after rollback |
-| Monitoring | Prometheus and Grafana provisioning | Request, latency, error, distribution, and confidence panels |
+| Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | Request, latency, error, distribution, confidence, and `mena_drift_psi_max` panels |
 | Drift detection | Evidently/PSI report and Airflow DAG | Successful Airflow task and generated report |
 | Feedback loop | Redis consumer and browser reviewer at `/reviewer` | Automatic uncertain example, confirmed Correct/Wrong/I don't know review, revision without duplicates, and deferred status |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |
 | Retraining gate | `configs/feedback.yaml`, dual feedback cursors, and `submit_vertex_retraining.py` | Threshold check, attempt deduplication, successful-deployment progress, and candidate run when thresholds are met |
 | Release observability | Control Center, release registry, and deployed baseline | Release history, gate failure reasons, `ON PROD` state, model identity, p50/p95 latency, and operational links |
-| CI/CD | `.github/workflows/ci.yml` | Passing visible jobs and Compose smoke job |
-| Load testing | Locust scenario and reports | Final run through Nginx with throughput, p95, and failures |
+| CI/CD | `.github/workflows/ci.yml` | Passing visible jobs, Compose smoke job, and registry-delivery configuration |
+| Load testing | Locust scalar and batch scenarios | Final run through Nginx with throughput, p95, and failures |
+
+## Current implementation evidence
+
+The following requirements are implemented and covered by code/tests; the
+remaining UI captures are intentionally deferred until the final joint
+evidence session:
+
+- Public gateway `/health` returns JSON with `status: healthy`.
+- Compose model readiness continues to use Bento's `/healthz` liveness route.
+- Drift writes `psi.prom`, publishes the same exposition to Pushgateway, and
+  Prometheus scrapes the Pushgateway job.
+- The six-layer student model distilled from the twelve-layer AraBERT teacher
+  is part of the model evidence set; retain its exact artifact path and
+  commit hash with the submission bundle.
+- The required peer-review text is in `docs/peer-review.md`.
+- README contains the exact three-command reviewer quickstart, final
+  architecture diagram, and session changelog.
 
 ## Screenshot naming
 
