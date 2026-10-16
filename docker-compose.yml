@@ -170,9 +170,16 @@ services:
       VERTEX_STAGING_BUCKET: ${VERTEX_STAGING_BUCKET:-gs://mena-mlops-project-dvc/vertex-staging}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
       MLFLOW_ARTIFACT_LOCATION: ${MLFLOW_ARTIFACT_LOCATION:-gs://mena-mlops-project-dvc/mlflow}
+      MENA_AUTO_DEPLOY_PROJECT_ROOT: ${MENA_HOST_PROJECT_ROOT:-/home/az-wsl/projects/mena-mlops-project}
+      DOCKER_COMPOSE_COMMAND: ${DOCKER_COMPOSE_COMMAND:-docker-compose}
       GOOGLE_APPLICATION_CREDENTIALS: /tmp/mena-gcp-key.json
+    group_add:
+      - "${DOCKER_GID:-1001}"
     volumes:
       - airflow-home:/opt/airflow
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker-compose:/usr/local/bin/docker-compose:ro
+      - .:${MENA_HOST_PROJECT_ROOT:-/home/az-wsl/projects/mena-mlops-project}
       - ./dags:/opt/airflow/dags:ro
       - ./src:/opt/mena-mlops-project/src:ro
       - ./scripts:/opt/mena-mlops-project/scripts:ro

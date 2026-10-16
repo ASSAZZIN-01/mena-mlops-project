@@ -7,11 +7,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
 from google.cloud import storage
 
+from mena_mlops.deployment.canary import docker_compose_command
 from mena_mlops.deployment_identity import build_deployment_identity
 from mena_mlops.observability import emit_event
 
@@ -160,8 +162,7 @@ def main() -> None:
         )
         subprocess.run(
             [
-                "docker",
-                "compose",
+                *docker_compose_command(),
                 "up",
                 "-d",
                 "model-candidate",
@@ -175,9 +176,7 @@ def main() -> None:
         if not args.manual_canary:
             subprocess.run(
                 [
-                    "uv",
-                    "run",
-                    "python",
+                    sys.executable,
                     "scripts/auto_canary.py",
                     "--duration-seconds",
                     str(args.stage_duration_seconds),

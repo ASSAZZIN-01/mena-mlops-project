@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 from dataclasses import dataclass
 
@@ -19,6 +20,12 @@ class TrafficSplit:
             raise ValueError("stable and candidate percentages must total 100")
 
 
+def docker_compose_command() -> list[str]:
+    """Return the configured Docker Compose executable and arguments."""
+
+    return shlex.split(os.getenv("DOCKER_COMPOSE_COMMAND", "docker compose"))
+
+
 def split_for_candidate(candidate: int) -> TrafficSplit:
     return TrafficSplit(stable=100 - candidate, candidate=candidate)
 
@@ -28,19 +35,12 @@ def apply_split(split: TrafficSplit) -> None:
     environment["STABLE_WEIGHT"] = str(split.stable)
     environment["CANDIDATE_WEIGHT"] = str(split.candidate)
     subprocess.run(
-        ["docker", "compose", "rm", "-sf", "nginx"],
+        [*docker_compose_command(), "rm", "-sf", "nginx"],
         env=environment,
         check=True,
     )
     subprocess.run(
-        [
-            "docker",
-            "compose",
-            "up",
-            "-d",
-            "--no-deps",
-            "nginx",
-        ],
+        [*docker_compose_command(), "up", "-d", "--no-deps", "nginx"],
         env=environment,
         check=True,
     )

@@ -33,6 +33,15 @@ TERMINAL_STATES = {
 }
 
 
+def _write_release_decision_uri(output_path: Path, release_prefix: str) -> str:
+    """Persist the exact release decision consumed by a deployment task."""
+
+    decision_uri = f"{release_prefix.rstrip('/')}/promotion_decision.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(decision_uri + "\n", encoding="utf-8")
+    return decision_uri
+
+
 def _upload(path: Path, uri: str) -> None:
     parsed = urlparse(uri)
     if parsed.scheme != "gs" or not parsed.netloc or not parsed.path:
@@ -130,6 +139,15 @@ def main() -> None:
         default="feedback-retraining",
         help="Display-name prefix for the Vertex job.",
     )
+    parser.add_argument(
+        "--release-decision-output",
+        type=Path,
+        default=None,
+        help=(
+            "Write the approved/rejected release decision URI here after a "
+            "successful Vertex job. Used by orchestrators for deployment."
+        ),
+    )
     args = parser.parse_args()
 
     config = yaml.safe_load(args.feedback_config.read_text(encoding="utf-8"))
@@ -153,6 +171,8 @@ def main() -> None:
         and current_drift_fingerprint != checkpoint.last_drift_fingerprint
     )
     if not args.manual and not (feedback_ready or drift_ready):
+        if args.release_decision_output is not None:
+            args.release_decision_output.unlink(missing_ok=True)
         emit_event(
             "retraining_skipped",
             "automatic_retraining",
@@ -261,6 +281,11 @@ def main() -> None:
         manual=args.manual,
     )
     _submit_and_wait(job_spec, project, region)
+    if args.release_decision_output is not None:
+        _write_release_decision_uri(
+            args.release_decision_output,
+            f"{prefix}/release",
+        )
     if not args.manual:
         store.mark_retraining_succeeded(
             feedback_upper_bound,

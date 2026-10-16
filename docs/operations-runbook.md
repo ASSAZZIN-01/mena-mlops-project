@@ -216,10 +216,31 @@ refused before Docker Compose is started.
 Automatic feedback/PSI retraining follows the same contract. The Airflow DAG
 submits the Vertex job; [vertex_train.py](../scripts/vertex_train.py) trains,
 evaluates, promotes, and publishes `model-card/model_card.json` beside the
-release artifacts. Airflow does not deploy every approved retraining result
-directly. When that release is sent through
-`deploy_approved_candidate.py`, the same validation and
-`deployment_identity.json` pointer are created.
+release artifacts. After a successful Vertex job, the DAG writes that release's
+promotion-decision URI to its run handoff file and starts the guarded deployment
+task. A skipped retraining run has no handoff and cannot deploy a stale release.
+The deployment task refuses rejected decisions, validates the matching approved
+model card, and then starts the candidate canary. The existing 5% → 20% → 50%
+→ 100% progression and automatic rollback remain active.
+
+The automatic deployment task is configured with:
+
+- `MENA_RETRAINING_RELEASE_DECISION`: run-local handoff file;
+- `MENA_AUTO_DEPLOY_OUTPUT`: candidate artifact directory;
+- `MENA_AUTO_DEPLOY_CANDIDATE_PERCENT`: initial candidate traffic percentage;
+- `MENA_AUTO_CANARY_STAGE_DURATION_SECONDS`: observation time per stage.
+
+The Airflow execution environment must have the same deployment prerequisites
+as the guarded deployment command: GCS credentials, access to the Docker
+Compose deployment target, and the gateway/Prometheus endpoints used by the
+canary checks. The same validation and `deployment_identity.json` pointer are
+created by `deploy_approved_candidate.py` during the automatic deployment task.
+For the local Compose target, set `MENA_HOST_PROJECT_ROOT` to the absolute
+checkout path and `DOCKER_GID` to the host Docker socket group ID. The Airflow
+service mounts that checkout at the same path and receives access to the Docker
+socket so its deployment task can update the candidate and Nginx services.
+`DOCKER_COMPOSE_COMMAND` selects the Compose executable; the provided local
+configuration uses the host's standalone `docker-compose` binary.
 
 The deployment command requires the host environment to load the project
 credentials before reading a GCS release:
