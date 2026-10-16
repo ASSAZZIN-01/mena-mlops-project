@@ -32,8 +32,66 @@ def main() -> None:
     )
     thresholds = load_thresholds()
     counts = store.counts()
-    st.subheader("Validated examples")
-    st.write({label: f"{counts[label]} / {thresholds[label]}" for label in LABELS})
+    annotation = store.annotation_summary(
+        Path(os.getenv("AUDIT_DB", "data/audit/predictions.db"))
+    )
+
+    with st.expander("Where does this feedback come from?", expanded=True):
+        st.markdown(
+            """
+            The inference services write every prediction to the audit database.
+            Predictions in the configured low-confidence window are also copied
+            to this review queue. **Correct** validates the model label, **Wrong**
+            records your corrected label, and **I don't know** defers ambiguous
+            text. Only validated labels count toward the retraining thresholds.
+            """
+        )
+
+    total_predictions = sum(
+        values["total_predictions"] for values in annotation.values()
+    )
+    suspected = sum(values["suspected"] for values in annotation.values())
+    reviewed = sum(values["reviewed"] for values in annotation.values())
+    pending = sum(values["pending"] for values in annotation.values())
+    metric_columns = st.columns(4)
+    metric_columns[0].metric("All predictions", total_predictions)
+    metric_columns[1].metric("Suspected queue", suspected)
+    metric_columns[2].metric("Reviewed", reviewed)
+    metric_columns[3].metric("Pending", pending)
+
+    st.subheader("Class and annotation progress")
+    for label in LABELS:
+        values = annotation[label]
+        queue_total = values["suspected"]
+        if queue_total:
+            reviewed_width = values["reviewed"] / queue_total * 100
+            confusing_width = values["confusing"] / queue_total * 100
+            pending_width = values["pending"] / queue_total * 100
+        else:
+            reviewed_width = confusing_width = pending_width = 0
+        st.markdown(
+            f"**{label.title()}** · {values['suspected']} suspected of "
+            f"{values['total_predictions']} predictions · "
+            f"{values['reviewed']} reviewed · {values['confusing']} confusing · "
+            f"{values['pending']} pending"
+        )
+        st.markdown(
+            f"""
+            <div class="feedback-progress" style="display:flex;height:12px;
+            border-radius:8px;overflow:hidden;background:#26364a">
+              <span style="width:{reviewed_width:.2f}%;background:#35b779"></span>
+              <span style="width:{confusing_width:.2f}%;background:#f5bd5b"></span>
+              <span style="width:{pending_width:.2f}%;background:#ef7c83"></span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Retraining threshold: "
+            f"{counts[label]} / {thresholds[label]} validated labels"
+        )
+
+    st.caption("Green = reviewed · Amber = confusing/deferred · Red = pending")
 
     item = store.next_pending()
     if item is None:
@@ -41,19 +99,29 @@ def main() -> None:
         return
 
     st.divider()
-    st.write(f"**Review ID:** {item.id}")
+    pending_before_item = pending
+    st.subheader("Current annotation")
+    context_columns = st.columns(3)
+    context_columns[0].metric("Queue position", f"1 / {pending_before_item}")
+    context_columns[1].metric(
+        f"{item.predicted_label.title()} queue",
+        f"{annotation[item.predicted_label]['pending']} pending",
+    )
+    context_columns[2].metric("Model confidence", f"{item.confidence:.1%}")
+    st.caption(
+        f"Review ID {item.id} · model version "
+        f"{os.getenv('MODEL_VERSION', 'stable service')} · oldest pending item first"
+    )
     st.write(f"**Review:** {item.text}")
     st.write(f"**Model prediction:** `{item.predicted_label}`")
-    st.write(f"**Confidence:** `{item.confidence:.1%}`")
 
     decision = st.radio(
         "Is the prediction correct?",
         options=("Correct", "Wrong", "I don't know"),
         horizontal=True,
         help=(
-            "Choose this when the text is ambiguous or you cannot confidently "
-            "validate the label. It will be deferred and excluded from "
-            "retraining counts."
+            "Correct keeps the predicted label. Wrong requires the true label. "
+            "I don't know defers ambiguous text and excludes it from retraining."
         ),
         key=f"decision-{item.id}",
     )

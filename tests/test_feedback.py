@@ -36,6 +36,64 @@ def test_deferred_feedback_is_not_validated_or_pending(tmp_path: Path) -> None:
     assert store.counts() == {"negative": 0, "neutral": 0, "positive": 0}
 
 
+def test_annotation_summary_combines_audit_denominators_and_queue_states(
+    tmp_path: Path,
+) -> None:
+    audit_path = tmp_path / "audit.db"
+    import sqlite3
+
+    with sqlite3.connect(audit_path) as connection:
+        connection.execute(
+            "CREATE TABLE predictions (prediction TEXT NOT NULL)"
+        )
+        connection.executemany(
+            "INSERT INTO predictions (prediction) VALUES (?)",
+            [("negative",), ("negative",), ("neutral",), ("positive",)],
+        )
+
+    store = FeedbackStore(tmp_path / "feedback.db")
+    reviewed = store.add_uncertain("نص مراجع", "negative", 0.5)
+    store.review(reviewed, correct=True)
+    deferred = store.add_uncertain("نص غامض", "negative", 0.5)
+    store.defer(deferred)
+    store.add_uncertain("نص معلق", "positive", 0.5)
+
+    assert store.annotation_summary(audit_path) == {
+        "negative": {
+            "total_predictions": 2,
+            "suspected": 2,
+            "reviewed": 1,
+            "confusing": 1,
+            "pending": 0,
+        },
+        "neutral": {
+            "total_predictions": 1,
+            "suspected": 0,
+            "reviewed": 0,
+            "confusing": 0,
+            "pending": 0,
+        },
+        "positive": {
+            "total_predictions": 1,
+            "suspected": 1,
+            "reviewed": 0,
+            "confusing": 0,
+            "pending": 1,
+        },
+    }
+
+
+def test_annotation_summary_handles_missing_audit_database(tmp_path: Path) -> None:
+    store = FeedbackStore(tmp_path / "feedback.db")
+    assert store.annotation_summary(tmp_path / "missing.db")["negative"] == {
+        "total_predictions": 0,
+        "suspected": 0,
+        "reviewed": 0,
+        "confusing": 0,
+        "pending": 0,
+    }
+
+
 def _review(store: FeedbackStore, label: str) -> int:
     item_id = store.add_uncertain("نص للمراجعة", "neutral", 0.5)
     store.review(item_id, correct=False, corrected_label=label)

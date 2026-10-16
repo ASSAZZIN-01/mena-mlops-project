@@ -199,6 +199,54 @@ class FeedbackStore:
             for label in LABELS
         }
 
+    def annotation_summary(self, audit_path: Path) -> dict[str, dict[str, int]]:
+        """Summarize prediction denominators and annotation states by label."""
+
+        summary = {
+            label: {
+                "total_predictions": 0,
+                "suspected": 0,
+                "reviewed": 0,
+                "confusing": 0,
+                "pending": 0,
+            }
+            for label in LABELS
+        }
+        if audit_path.is_file():
+            with sqlite3.connect(audit_path) as audit_connection:
+                rows = audit_connection.execute(
+                    """
+                    SELECT prediction, COUNT(*) AS count
+                    FROM predictions
+                    GROUP BY prediction
+                    """
+                ).fetchall()
+        else:
+            rows = []
+        for label, count in rows:
+            if label in summary:
+                summary[str(label)]["total_predictions"] = int(count)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT predicted_label, review_status, COUNT(*) AS count
+                FROM feedback
+                GROUP BY predicted_label, review_status
+                """
+            ).fetchall()
+        for label, status, count in rows:
+            if label not in summary:
+                continue
+            summary[str(label)]["suspected"] += int(count)
+            state_key = {
+                "validated": "reviewed",
+                "deferred": "confusing",
+                "pending": "pending",
+            }.get(str(status))
+            if state_key is not None:
+                summary[str(label)][state_key] += int(count)
+        return summary
+
     def counts_since(
         self,
         feedback_id: int,

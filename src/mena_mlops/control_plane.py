@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -32,6 +33,9 @@ STATIC_DIR = Path(
 FEEDBACK_DB = Path(
     os.getenv("FEEDBACK_DB", str(PROJECT_ROOT / "data" / "feedback" / "reviewed.db"))
 )
+AUDIT_DB = Path(
+    os.getenv("AUDIT_DB", str(PROJECT_ROOT / "data" / "audit" / "predictions.db"))
+)
 FEEDBACK_CONFIG = Path(
     os.getenv("FEEDBACK_CONFIG", str(PROJECT_ROOT / "configs" / "feedback.yaml"))
 )
@@ -54,9 +58,22 @@ def _feedback_summary() -> dict[str, object]:
             "counts": counts,
             "thresholds": thresholds,
             "ready": all(counts[label] >= thresholds[label] for label in thresholds),
+            "annotation": FeedbackStore(FEEDBACK_DB).annotation_summary(AUDIT_DB),
         }
-    except (FileNotFoundError, KeyError, OSError, yaml.YAMLError) as error:
-        return {"error": str(error), "counts": {}, "thresholds": {}, "ready": False}
+    except (
+        FileNotFoundError,
+        KeyError,
+        OSError,
+        sqlite3.Error,
+        yaml.YAMLError,
+    ) as error:
+        return {
+            "error": str(error),
+            "counts": {},
+            "thresholds": {},
+            "annotation": {},
+            "ready": False,
+        }
 
 
 def _health(url: str) -> dict[str, str]:

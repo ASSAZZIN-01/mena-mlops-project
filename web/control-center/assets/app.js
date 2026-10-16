@@ -60,14 +60,74 @@ function renderFeedback() {
   const feedback = state.overview.feedback || {};
   const counts = feedback.counts || {};
   const thresholds = feedback.thresholds || {};
-  $("#view-feedback").innerHTML = `<article class="panel"><h2>Feedback retraining readiness</h2>
+  const annotation = feedback.annotation || {};
+  const labels = Object.keys(thresholds);
+  const chart = (parts, colors) => {
+    const total = parts.reduce((sum, part) => sum + part.value, 0);
+    if (!total) return '<div class="donut donut-empty"><span>No data</span></div>';
+    let offset = 0;
+    const stops = parts.map((part, index) => {
+      const start = offset / total * 100; offset += part.value;
+      return `${colors[index]} ${start}% ${offset / total * 100}%`;
+    }).join(", ");
+    return `<div class="donut" style="background:conic-gradient(${stops})"><span>${total}</span></div>`;
+  };
+  const legend = (parts, colors) => parts.map((part, index) =>
+    `<span class="legend-item"><i style="background:${colors[index]}"></i>${escapeHtml(part.label)}: ${part.value}</span>`
+  ).join("");
+  const classCards = labels.map((label) => {
+    const values = annotation[label] || {};
+    const total = Number(values.total_predictions || 0);
+    const suspected = Number(values.suspected || 0);
+    const reviewed = Number(values.reviewed || 0);
+    const confusing = Number(values.confusing || 0);
+    const pending = Number(values.pending || 0);
+    const queueTotal = Math.max(suspected, 1);
+    const segments = [
+      ["reviewed", reviewed, "var(--accent)"],
+      ["confusing", confusing, "var(--warning)"],
+      ["pending", pending, "var(--danger)"],
+    ];
+    return `<article class="feedback-class panel">
+      <div class="feedback-class-heading"><h3>${escapeHtml(label)}</h3>
+        <span class="muted">${suspected} suspected / ${total} predictions</span></div>
+      <div class="chart-row">
+        <div><div class="chart-title">Queue share</div>${chart([
+          {label: "Suspected", value: suspected},
+          {label: "Other", value: Math.max(total - suspected, 0)},
+        ], ["var(--warning)", "var(--border)"])}
+        <div class="legend">${legend([
+          {label: "Suspected", value: suspected},
+          {label: "Other", value: Math.max(total - suspected, 0)},
+        ], ["var(--warning)", "var(--border)"])}</div></div>
+        <div><div class="chart-title">Annotation state</div>${chart([
+          {label: "Reviewed", value: reviewed},
+          {label: "Confusing", value: confusing},
+          {label: "Pending", value: pending},
+        ], ["var(--accent)", "var(--warning)", "var(--danger)"])}
+        <div class="legend">${legend([
+          {label: "Reviewed", value: reviewed},
+          {label: "Confusing", value: confusing},
+          {label: "Pending", value: pending},
+        ], ["var(--accent)", "var(--warning)", "var(--danger)"])}</div></div>
+      </div>
+      <div class="feedback-progress" aria-label="${escapeHtml(label)} annotation progress">
+        ${segments.map(([name, value, color]) => `<span class="progress-${name}" style="width:${value / queueTotal * 100}%;background:${color}" title="${name}: ${value}"></span>`).join("")}
+      </div>
+      <div class="progress-caption"><span>${reviewed + confusing} of ${suspected} triaged</span><span>${counts[label] || 0} / ${thresholds[label]} validated for retraining</span></div>
+    </article>`;
+  }).join("");
+  $("#view-feedback").innerHTML = `<article class="panel feedback-guidance"><h2>How feedback moves the model forward</h2>
+    <p>Every prediction is recorded by the inference service. Low-confidence predictions enter the suspected queue for human review. Reviewed labels count toward retraining; confusing/deferred items remain visible but do not count toward the retraining gate.</p>
+    <div class="feedback-legend"><span><i class="legend-dot reviewed"></i>Reviewed</span><span><i class="legend-dot confusing"></i>Confusing / deferred</span><span><i class="legend-dot pending"></i>Pending</span></div>
+  </article><article class="panel"><h2>Feedback retraining readiness</h2>
     ${Object.keys(thresholds).map((label) => {
       const count = counts[label] || 0; const threshold = thresholds[label] || 1;
       return `<div style="margin: 16px 0"><div style="display:flex;justify-content:space-between"><span>${escapeHtml(label)}</span><span>${count} / ${threshold}</span></div><div class="progress"><span style="width:${Math.min(100, count / threshold * 100)}%"></span></div></div>`;
     }).join("")}
     <p>${feedback.ready ? '<span class="status status-approved">Ready to retrain</span>' : '<span class="status status-training">Collecting validated feedback</span>'}</p>
     <a class="button-link" href="${escapeHtml(state.overview.links?.feedback || "#")}" target="_blank">Open reviewer interface →</a>
-  </article>`;
+  </article><section class="feedback-grid">${classCards}</section>`;
 }
 
 async function renderDeployments() {
