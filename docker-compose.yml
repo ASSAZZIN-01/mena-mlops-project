@@ -125,6 +125,7 @@ services:
         condition: service_started
     environment:
       MENA_PROJECT_ROOT: /opt/mena-mlops-project
+      PYTHONPATH: /opt/mena-mlops-project/src
       CONTROL_PLANE_DB: /opt/mena-mlops-project/reports/control-plane/releases.db
       CONTROL_PLANE_STATIC_DIR: /opt/mena-mlops-project/web/control-center
       MODEL_API_URL: http://nginx:8080
