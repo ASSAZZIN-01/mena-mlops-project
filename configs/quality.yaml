@@ -3,3 +3,4 @@ model_quality:
   minimum_test_neutral_f1: 0.0
 optimization:
   maximum_macro_f1_drop_percent: 5.0
+  maximum_deployed_performance_regression_percent: 3.0

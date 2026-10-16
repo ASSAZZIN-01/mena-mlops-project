@@ -182,16 +182,24 @@ includes input and prediction drift; verified labels will be added as a
 separate quality evaluation gate because they arrive later than predictions.
 
 For Airflow, the Compose image includes the monitoring package and copies the
-DAG from `dags/evidently_drift.py` into Airflow's DAG directory. The local
-verification schedule runs every 10 minutes. Restore a daily production
-schedule with `MENA_DRIFT_SCHEDULE="0 2 * * *"` after the demonstration. The
-DAG accepts these environment variables:
+DAG from `dags/evidently_drift.py` into Airflow's DAG directory. The default
+schedule runs every six hours (`0 */6 * * *`), and the DAG accepts manual
+triggers from the Airflow UI or CLI:
+
+```bash
+docker compose exec airflow airflow dags trigger mena_evidently_drift
+```
+
+Only one DAG run is active at a time. Wait for the active run to finish before
+manually triggering another retraining; this prevents duplicate Vertex jobs.
+The schedule can be overridden with `MENA_DRIFT_SCHEDULE`. The DAG accepts
+these environment variables:
 
 - `MENA_PROJECT_ROOT`
 - `MENA_DRIFT_REFERENCE`
 - `MENA_DRIFT_CURRENT`
 - `MENA_DRIFT_OUTPUT`
-- `MENA_DRIFT_SCHEDULE` (default: every 10 minutes for local verification)
+- `MENA_DRIFT_SCHEDULE` (default: every six hours)
 - `VERTEX_PROJECT_ID`
 - `VERTEX_REGION` (default: `us-central1`)
 - `VERTEX_MACHINE_TYPE` (default: `n1-standard-4`)

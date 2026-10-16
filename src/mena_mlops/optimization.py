@@ -50,6 +50,7 @@ def benchmark_callable(
         "iterations": float(iterations),
         "mean_ms": sum(samples) / len(samples),
         "p95_ms": samples[min(len(samples) - 1, int(len(samples) * 0.95))],
+        "throughput_rps": 1000.0 * len(samples) / sum(samples),
     }
 
 

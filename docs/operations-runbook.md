@@ -127,6 +127,15 @@ exact Git/DVC lineage, configurations, split hashes, MLflow run, Vertex job,
 hardware image, evaluation, and release artifact hashes. Automatic Vertex
 retraining publishes the same two files beside its release artifacts.
 
+Every successful deployment also persists `reports/retraining/deployed_baseline.json`.
+The next automatic retraining uploads that baseline to Vertex and compares the
+candidate with the currently deployed variant on the same test set. Candidate
+macro-F1 and every per-class F1 must be at least the deployed values. Mean
+latency may regress by at most 3%, and throughput may regress by at most 3%.
+Failure of either the quality or deployed-model performance gate rejects the
+release and prevents deployment. The baseline is updated only after a guarded
+deployment and canary complete successfully.
+
 ## 3.1 Structured lifecycle logs
 
 Training, Vertex submission/state changes, promotion, deployment, canary

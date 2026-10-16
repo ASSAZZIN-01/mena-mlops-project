@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import subprocess
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -62,9 +63,27 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _repository_root() -> Path:
+    return Path(
+        os.environ.get(
+            "MENA_HOST_PROJECT_ROOT",
+            os.environ.get("MENA_AUTO_DEPLOY_PROJECT_ROOT", str(Path.cwd())),
+        )
+    )
+
+
 def _git_commit() -> str:
+    repository_root = _repository_root()
     return subprocess.check_output(
-        ["git", "rev-parse", "HEAD"],
+        [
+            "git",
+            "-c",
+            f"safe.directory={repository_root}",
+            "-C",
+            str(repository_root),
+            "rev-parse",
+            "HEAD",
+        ],
         text=True,
     ).strip()
 
@@ -207,16 +226,32 @@ def main() -> None:
         for split in ("train", "validation", "test"):
             _upload(args.data_dir / f"{split}.parquet", f"{prefix}/{split}.parquet")
         _upload(feedback_path, f"{prefix}/feedback.parquet")
-    lineage_path = args.data_dir.parent / ".vertex-retraining-lineage.json"
+    deployed_baseline_path = Path(
+        os.getenv(
+            "DEPLOYED_MODEL_BASELINE_PATH",
+            "reports/retraining/deployed_baseline.json",
+        )
+    )
+    deployed_baseline_uri: str | None = None
+    if deployed_baseline_path.is_file():
+        deployed_baseline_uri = f"{prefix}/deployed_baseline.json"
+        _upload(deployed_baseline_path, deployed_baseline_uri)
+    lineage_fd, lineage_name = tempfile.mkstemp(prefix="vertex-retraining-lineage-")
+    os.close(lineage_fd)
+    lineage_path = Path(lineage_name)
     lineage_path.write_text(
         json.dumps(
             {
                 "git_commit": _git_commit(),
                 "dvc_commit": _git_commit(),
-                "dvc_lock_sha256": _sha256(Path("dvc.lock")),
-                "dvc_yaml_sha256": _sha256(Path("dvc.yaml")),
-                "training_config_sha256": _sha256(Path("configs/training.yaml")),
-                "data_config_sha256": _sha256(Path("configs/data.yaml")),
+                "dvc_lock_sha256": _sha256(_repository_root() / "dvc.lock"),
+                "dvc_yaml_sha256": _sha256(_repository_root() / "dvc.yaml"),
+                "training_config_sha256": _sha256(
+                    _repository_root() / "configs/training.yaml"
+                ),
+                "data_config_sha256": _sha256(
+                    _repository_root() / "configs/data.yaml"
+                ),
                 "training_image": image_uri,
                 "reproduction_command": (
                     "python scripts/submit_vertex_retraining.py --manual "
@@ -276,6 +311,13 @@ def main() -> None:
             ],
         },
     }
+    if deployed_baseline_uri is not None:
+        job_spec["jobSpec"]["workerPoolSpecs"][0]["containerSpec"]["env"].append(
+            {
+                "name": "VERTEX_DEPLOYED_BASELINE_URI",
+                "value": deployed_baseline_uri,
+            }
+        )
     emit_event(
         "retraining_submission_started",
         "automatic_retraining",
@@ -308,10 +350,14 @@ class tempfile_feedback:
         database: Path,
         after_id: int,
         through_id: int,
+        reviewed_after: str | None = None,
+        reviewed_through: str | None = None,
     ) -> None:
         self.database = database
         self.after_id = after_id
         self.through_id = through_id
+        self.reviewed_after = reviewed_after
+        self.reviewed_through = reviewed_through
         self.path: Path | None = None
 
     def __enter__(self) -> Path:
@@ -324,6 +370,8 @@ class tempfile_feedback:
             self.path,
             after_id=self.after_id,
             through_id=self.through_id,
+            reviewed_after=self.reviewed_after,
+            reviewed_through=self.reviewed_through,
         )
         return self.path
 

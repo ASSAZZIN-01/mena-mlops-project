@@ -12,7 +12,7 @@ from pendulum import datetime
 
 @dag(
     dag_id="mena_evidently_drift",
-    schedule=os.getenv("MENA_DRIFT_SCHEDULE", "*/10 * * * *"),
+    schedule=os.getenv("MENA_DRIFT_SCHEDULE", "0 */6 * * *"),
     start_date=datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
     max_active_runs=1,
