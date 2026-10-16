@@ -45,6 +45,7 @@ healthy. The main endpoints are:
 | --- | --- |
 | Gateway | http://localhost:8080 |
 | Reviewer dashboard | http://localhost:8501 |
+| MLOps Control Center | http://localhost:8503 |
 | Feedback review | http://localhost:8502 |
 | Grafana | http://localhost:3000 |
 | MLflow | http://localhost:5000 |
@@ -135,6 +136,13 @@ latency may regress by at most 3%, and throughput may regress by at most 3%.
 Failure of either the quality or deployed-model performance gate rejects the
 release and prevents deployment. The baseline is updated only after a guarded
 deployment and canary complete successfully.
+
+The MLOps Control Center at `http://localhost:8503` is the operator-facing
+release view. It reads the durable registry at
+`reports/control-plane/releases.db` and displays retraining history, gate
+results, exact rejection reasons, deployment status, feedback readiness, and
+service health. Airflow, Grafana, MLflow, Prometheus, and the feedback
+reviewer remain available as specialist drill-down tools.
 
 ## 3.1 Structured lifecycle logs
 

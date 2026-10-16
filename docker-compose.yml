@@ -114,6 +114,37 @@ services:
       - --server.address=0.0.0.0
       - --server.port=8501
 
+  control-plane:
+    build: .
+    depends_on:
+      nginx:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    environment:
+      MENA_PROJECT_ROOT: /opt/mena-mlops-project
+      CONTROL_PLANE_DB: /opt/mena-mlops-project/reports/control-plane/releases.db
+      CONTROL_PLANE_STATIC_DIR: /opt/mena-mlops-project/web/control-center
+      MODEL_API_URL: http://nginx:8080
+      PROMETHEUS_URL: http://prometheus:9090
+      MLFLOW_URL: http://mlflow:5000
+      AIRFLOW_URL: http://localhost:8081
+      GRAFANA_URL: http://localhost:3000
+      FEEDBACK_URL: http://localhost:8502
+      FEEDBACK_DB: /opt/mena-mlops-project/data/feedback/reviewed.db
+      FEEDBACK_CONFIG: /opt/mena-mlops-project/configs/feedback.yaml
+    ports:
+      - "8503:8503"
+    volumes:
+      - .:/opt/mena-mlops-project
+    command:
+      - uvicorn
+      - mena_mlops.control_plane:app
+      - --host=0.0.0.0
+      - --port=8503
+
   mlflow:
     build:
       context: deploy/mlflow

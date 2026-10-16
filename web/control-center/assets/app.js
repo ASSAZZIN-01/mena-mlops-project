@@ -1,0 +1,135 @@
+const state = { overview: null, releases: [], selectedRelease: null };
+
+const $ = (selector) => document.querySelector(selector);
+const escapeHtml = (value) => String(value ?? "")
+  .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+const statusClass = (value) => `status status-${String(value || "unknown").replaceAll(" ", "_")}`;
+const statusBadge = (value) => `<span class="${statusClass(value)}">${escapeHtml(value || "unknown")}</span>`;
+const formatDate = (value) => value ? new Date(value).toLocaleString() : "—";
+
+async function getJson(path) {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+  return response.json();
+}
+
+function renderSummary() {
+  const latest = state.overview.latest_release;
+  const feedback = state.overview.feedback || {};
+  const counts = feedback.counts || {};
+  const thresholds = feedback.thresholds || {};
+  const feedbackText = Object.keys(thresholds).map(
+    (label) => `${label}: ${counts[label] || 0}/${thresholds[label]}`
+  ).join(" · ");
+  $("#summary").innerHTML = [
+    ["Latest release", latest ? statusBadge(latest.status) : "No releases", latest?.release_id || "Waiting for first run"],
+    ["Production", latest?.deployment_status === "deployed" ? "Candidate active" : "Stable unchanged", "Guarded deployment state"],
+    ["Feedback readiness", feedback.ready ? "READY" : "Collecting", feedbackText || "Feedback database unavailable"],
+    ["Recorded releases", state.overview.release_count || 0, "Durable lifecycle history"],
+  ].map(([label, value, detail]) => `<article class="card"><div class="label">${label}</div><div class="value">${value}</div><div class="detail">${escapeHtml(detail)}</div></article>`).join("");
+}
+
+function renderOverview() {
+  const services = state.overview.services || {};
+  const serviceHtml = Object.entries(services).map(([name, value]) =>
+    `<div class="service"><span>${escapeHtml(name)}</span><span class="dot ${value.status === "healthy" ? "healthy" : ""}" title="${escapeHtml(value.detail)}"></span></div>`
+  ).join("");
+  const latest = state.overview.latest_release;
+  $("#view-overview").innerHTML = `
+    <div class="two-col">
+      <article class="panel">
+        <h2>Latest retraining outcome</h2>
+        ${latest ? `<div class="release-row" onclick="showRelease('${escapeHtml(latest.release_id)}')">
+          <div><strong>${escapeHtml(latest.release_id)}</strong><div class="muted">${escapeHtml(latest.trigger)} trigger · ${formatDate(latest.started_at)}</div></div>
+          <div>${statusBadge(latest.status)}</div><div>${statusBadge(latest.deployment_status)}</div><div>View details →</div>
+        </div>` : `<p class="empty">No release has been recorded yet.</p>`}
+      </article>
+      <article class="panel">
+        <h2>Service health</h2>
+        <div class="service-list">${serviceHtml || '<p class="empty">No health data.</p>'}</div>
+      </article>
+    </div>
+    <article class="panel">
+      <h2>How to read a release</h2>
+      <p class="muted">A rejected candidate is a successful safety outcome: the model was evaluated, the failing gate explains why it was not promoted, and production remains unchanged. A deployment failure is different: all model gates passed, but serving or canary verification failed.</p>
+    </article>`;
+}
+
+function renderFeedback() {
+  const feedback = state.overview.feedback || {};
+  const counts = feedback.counts || {};
+  const thresholds = feedback.thresholds || {};
+  $("#view-feedback").innerHTML = `<article class="panel"><h2>Feedback retraining readiness</h2>
+    ${Object.keys(thresholds).map((label) => {
+      const count = counts[label] || 0; const threshold = thresholds[label] || 1;
+      return `<div style="margin: 16px 0"><div style="display:flex;justify-content:space-between"><span>${escapeHtml(label)}</span><span>${count} / ${threshold}</span></div><div class="progress"><span style="width:${Math.min(100, count / threshold * 100)}%"></span></div></div>`;
+    }).join("")}
+    <p>${feedback.ready ? '<span class="status status-approved">Ready to retrain</span>' : '<span class="status status-training">Collecting validated feedback</span>'}</p>
+    <a class="button-link" href="${escapeHtml(state.overview.links?.feedback || "#")}" target="_blank">Open reviewer interface →</a>
+  </article>`;
+}
+
+function renderLinks() {
+  const links = state.overview.links || {};
+  $("#view-links").innerHTML = `<article class="panel"><h2>Specialist tools</h2><table><thead><tr><th>Tool</th><th>Purpose</th><th>Open</th></tr></thead><tbody>
+    ${[
+      ["airflow", "DAG orchestration, task logs, and manual triggers"],
+      ["grafana", "Detailed runtime time-series and canary metrics"],
+      ["mlflow", "Experiment runs, parameters, and artifacts"],
+      ["prometheus", "Raw metrics and PromQL exploration"],
+      ["feedback", "Human review of uncertain predictions"],
+    ].map(([name, purpose]) => `<tr><td>${name}</td><td class="muted">${purpose}</td><td><a class="button-link" href="${escapeHtml(links[name] || "#")}" target="_blank">Open →</a></td></tr>`).join("")}
+  </tbody></table></article>`;
+}
+
+function renderReleaseList() {
+  $("#view-releases").innerHTML = `<article class="panel"><h2>Retraining and release history</h2>
+    ${state.releases.length ? state.releases.map((release) => `<div class="release-row" onclick="showRelease('${escapeHtml(release.release_id)}')">
+      <div><strong>${escapeHtml(release.release_id)}</strong><div class="muted">${escapeHtml(release.trigger)} · ${formatDate(release.started_at)}</div></div>
+      <div>${statusBadge(release.status)}</div><div>${escapeHtml(release.candidate_variant || "—")}</div><div>${statusBadge(release.deployment_status)}</div>
+    </div>`).join("") : '<p class="empty">No recorded retraining releases.</p>'}</article>`;
+}
+
+async function showRelease(releaseId) {
+  try {
+    const release = await getJson(`/api/releases/${encodeURIComponent(releaseId)}`);
+    state.selectedRelease = release;
+    const gateHtml = (release.gates || []).map((gate) => `<div class="gate ${gate.accepted ? "" : "failed"}">
+      <div>${gate.accepted ? "✓" : "!"}</div><div><h3>${escapeHtml(gate.gate_name.replaceAll("_", " "))} ${statusBadge(gate.accepted ? "passed" : "failed")}</h3>
+      ${(gate.failures || []).map((failure) => `<p>${escapeHtml(failure)}</p>`).join("") || '<p>All checks passed.</p>'}</div>
+    </div>`).join("");
+    const events = (release.events || []).map((event) => `<div class="timeline-item ${event.status === "failed" ? "failed" : ""}"><strong>${escapeHtml(event.event_type.replaceAll("_", " "))}</strong><small>${formatDate(event.timestamp)} · ${escapeHtml(event.status || "recorded")}</small></div>`).join("");
+    $("#view-releases").innerHTML = `<article class="panel"><button class="button button-secondary" onclick="renderReleaseList()">← All releases</button><h2 style="margin-top:18px">${escapeHtml(release.release_id)}</h2>
+      <p>${statusBadge(release.status)} &nbsp; ${statusBadge(release.deployment_status)} &nbsp; <span class="muted">${escapeHtml(release.trigger)} trigger · ${escapeHtml(release.candidate_variant || "variant pending")}</span></p>
+      <div class="two-col"><div><h2>Gate matrix</h2><div class="gate-list">${gateHtml || '<p class="empty">Gate results are not available yet.</p>'}</div></div><div><h2>Lifecycle</h2><div class="timeline">${events || '<p class="empty">No lifecycle events recorded.</p>'}</div></div></div>
+      <details><summary>Decision evidence</summary><pre>${escapeHtml(JSON.stringify(release.decision || {}, null, 2))}</pre></details>
+    </article>`;
+    document.querySelector('[data-view="releases"]').click();
+  } catch (error) { showError(error); }
+}
+
+function showError(error) {
+  $("#alerts").innerHTML = `<div class="alert">Dashboard data could not be loaded: ${escapeHtml(error.message)}</div>`;
+}
+
+async function refresh() {
+  try {
+    state.overview = await getJson("/api/overview");
+    state.releases = await getJson("/api/releases");
+    renderSummary(); renderOverview(); renderFeedback(); renderLinks(); renderReleaseList();
+    $("#updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    $("#alerts").innerHTML = "";
+  } catch (error) { showError(error); }
+}
+
+document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+  document.querySelectorAll(".view").forEach((item) => item.classList.add("hidden"));
+  tab.classList.add("active"); $(`#view-${tab.dataset.view}`).classList.remove("hidden");
+}));
+$("#refresh").addEventListener("click", refresh);
+window.showRelease = showRelease;
+window.renderReleaseList = renderReleaseList;
+refresh();
+setInterval(refresh, 15000);

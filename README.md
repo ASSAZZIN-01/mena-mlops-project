@@ -147,6 +147,12 @@ uv run python scripts/canary.py --candidate 20
 uv run python scripts/canary.py --rollback
 ```
 
+The MLOps Control Center is at `http://localhost:8503`. It provides the
+operator-facing release history, gate matrix, retraining readiness, service
+health, and links to Airflow, Grafana, MLflow, Prometheus, and feedback review.
+Rejected releases are shown separately from deployment failures, with the
+measured gate failure reasons and production-preservation status.
+
 Batch scoring supports JSONL and Parquet:
 
 ```bash
