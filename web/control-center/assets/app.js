@@ -1,4 +1,4 @@
-const state = { overview: null, releases: [], selectedRelease: null };
+const state = { overview: null, releases: [], deployments: null, selectedRelease: null };
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value ?? "")
@@ -6,6 +6,7 @@ const escapeHtml = (value) => String(value ?? "")
   .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const statusClass = (value) => `status status-${String(value || "unknown").replaceAll(" ", "_")}`;
 const statusBadge = (value) => `<span class="${statusClass(value)}">${escapeHtml(value || "unknown")}</span>`;
+const productionBadge = () => '<span class="production-badge">ON PROD</span>';
 const formatDate = (value) => value ? new Date(value).toLocaleString() : "—";
 
 async function getJson(path) {
@@ -16,6 +17,7 @@ async function getJson(path) {
 
 function renderSummary() {
   const latest = state.overview.latest_release;
+  const current = state.deployments?.current;
   const feedback = state.overview.feedback || {};
   const counts = feedback.counts || {};
   const thresholds = feedback.thresholds || {};
@@ -24,7 +26,7 @@ function renderSummary() {
   ).join(" · ");
   $("#summary").innerHTML = [
     ["Latest release", latest ? statusBadge(latest.status) : "No releases", latest?.release_id || "Waiting for first run"],
-    ["Production", latest?.deployment_status === "deployed" ? "Candidate active" : "Stable unchanged", "Guarded deployment state"],
+    ["Production", current ? `${productionBadge()} ${escapeHtml(current.model_id || "Active model")}` : "No baseline", current ? `Variant: ${current.selected_variant || "unknown"}` : "No deployed baseline recorded"],
     ["Feedback readiness", feedback.ready ? "READY" : "Collecting", feedbackText || "Feedback database unavailable"],
     ["Recorded releases", state.overview.release_count || 0, "Durable lifecycle history"],
   ].map(([label, value, detail]) => `<article class="card"><div class="label">${label}</div><div class="value">${value}</div><div class="detail">${escapeHtml(detail)}</div></article>`).join("");
@@ -45,6 +47,12 @@ function renderOverview() {
           <div>${statusBadge(latest.status)}</div><div>${statusBadge(latest.deployment_status)}</div><div>View details →</div>
         </div>` : `<p class="empty">No release has been recorded yet.</p>`}
       </article>
+      ${state.deployments?.current ? `<article class="panel production-panel">
+        <h2>Active production baseline</h2>
+        <div class="production-heading">${productionBadge()}<strong>${escapeHtml(state.deployments.current.model_id || "Active model")}</strong></div>
+        <p class="muted">This baseline is active in serving but is not linked to a recorded release lifecycle entry.</p>
+        <p>Variant: <strong>${escapeHtml(state.deployments.current.selected_variant || "unknown")}</strong> · Macro-F1: <strong>${Number(state.deployments.current.quality?.macro_f1 || 0).toFixed(4)}</strong></p>
+      </article>` : ""}
       <article class="panel">
         <h2>Service health</h2>
         <div class="service-list">${serviceHtml || '<p class="empty">No health data.</p>'}</div>
@@ -137,9 +145,10 @@ function renderFeedback() {
 
 async function renderDeployments() {
   const data = await getJson("/api/deployments");
+  state.deployments = data;
   const current = data.current;
   $("#view-deployments").innerHTML = `<article class="panel"><h2>Current deployment</h2>
-    ${current ? `<div class="two-col"><div><p class="eyebrow">Active model</p><h2>${escapeHtml(current.model_id || "unknown")}</h2><p class="muted">Variant: ${escapeHtml(current.selected_variant || "unknown")}</p></div><div><p class="eyebrow">Performance baseline</p><p>Macro-F1: <strong>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</strong></p><p>Latency: <strong>${Number(current.latency?.mean_ms || 0).toFixed(2)} ms</strong></p><p>Throughput: <strong>${Number(current.latency?.throughput_rps || 0).toFixed(2)} req/s</strong></p></div></div>` : '<p class="empty">No deployed baseline is recorded.</p>'}
+    ${current ? `<div class="two-col"><div><p class="eyebrow">Active model</p><div class="production-heading">${productionBadge()}<h2>${escapeHtml(current.model_id || "unknown")}</h2></div><p class="muted">Variant: ${escapeHtml(current.selected_variant || "unknown")}</p><p class="muted">The active baseline is not linked to a release record yet.</p></div><div><p class="eyebrow">Performance baseline</p><p>Macro-F1: <strong>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</strong></p><p>Latency: <strong>${Number(current.latency?.mean_ms || 0).toFixed(2)} ms</strong></p><p>Throughput: <strong>${Number(current.latency?.throughput_rps || 0).toFixed(2)} req/s</strong></p></div></div>` : '<p class="empty">No deployed baseline is recorded.</p>'}
   </article><article class="panel"><h2>Release deployment history</h2>
     ${data.history.length ? data.history.map((release) => `<div class="release-row" onclick="showRelease('${escapeHtml(release.release_id)}')"><div><strong>${escapeHtml(release.release_id)}</strong><div class="muted">${formatDate(release.completed_at)}</div></div><div>${statusBadge(release.status)}</div><div>${statusBadge(release.deployment_status)}</div><div>View →</div></div>`).join("") : '<p class="empty">No deployment attempts recorded.</p>'}</article>`;
 }
@@ -167,6 +176,10 @@ function renderLinks() {
 
 function renderReleaseList() {
   $("#view-releases").innerHTML = `<article class="panel"><h2>Retraining and release history</h2>
+    ${state.deployments?.current ? `<div class="release-row production-row">
+      <div><strong>${escapeHtml(state.deployments.current.model_id || "Active production baseline")}</strong><div class="muted">Imported production baseline · current serving model</div></div>
+      <div>${productionBadge()}</div><div>${escapeHtml(state.deployments.current.selected_variant || "—")}</div><div>${statusBadge("deployed")}</div>
+    </div>` : ""}
     ${state.releases.length ? state.releases.map((release) => `<div class="release-row" onclick="showRelease('${escapeHtml(release.release_id)}')">
       <div><strong>${escapeHtml(release.release_id)}</strong><div class="muted">${escapeHtml(release.trigger)} · ${formatDate(release.started_at)}</div></div>
       <div>${statusBadge(release.status)}</div><div>${escapeHtml(release.candidate_variant || "—")}</div><div>${statusBadge(release.deployment_status)}</div>
@@ -183,7 +196,7 @@ async function showRelease(releaseId) {
     </div>`).join("");
     const events = (release.events || []).map((event) => `<div class="timeline-item ${event.status === "failed" ? "failed" : ""}"><strong>${escapeHtml(event.event_type.replaceAll("_", " "))}</strong><small>${formatDate(event.timestamp)} · ${escapeHtml(event.status || "recorded")}</small></div>`).join("");
     $("#view-releases").innerHTML = `<article class="panel"><button class="button button-secondary" onclick="renderReleaseList()">← All releases</button><h2 style="margin-top:18px">${escapeHtml(release.release_id)}</h2>
-      <p>${statusBadge(release.status)} &nbsp; ${statusBadge(release.deployment_status)} &nbsp; <span class="muted">${escapeHtml(release.trigger)} trigger · ${escapeHtml(release.candidate_variant || "variant pending")}</span></p>
+      <p>${release.deployment_status === "deployed" ? productionBadge() : ""} ${statusBadge(release.status)} &nbsp; ${statusBadge(release.deployment_status)} &nbsp; <span class="muted">${escapeHtml(release.trigger)} trigger · ${escapeHtml(release.candidate_variant || "variant pending")}</span></p>
       <div class="two-col"><div><h2>Gate matrix</h2><div class="gate-list">${gateHtml || '<p class="empty">Gate results are not available yet.</p>'}</div></div><div><h2>Lifecycle</h2><div class="timeline">${events || '<p class="empty">No lifecycle events recorded.</p>'}</div></div></div>
       <details><summary>Decision evidence</summary><pre>${escapeHtml(JSON.stringify(release.decision || {}, null, 2))}</pre></details>
     </article>`;
@@ -199,6 +212,7 @@ async function refresh() {
   try {
     state.overview = await getJson("/api/overview");
     state.releases = await getJson("/api/releases");
+    state.deployments = await getJson("/api/deployments");
     renderSummary(); renderOverview(); renderFeedback(); renderLinks(); renderReleaseList();
     await renderDeployments(); await renderModels();
     $("#updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;

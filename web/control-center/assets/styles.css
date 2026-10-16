@@ -62,6 +62,11 @@ body {
 .status-rejected, .status-failed, .status-not_attempted { background: rgba(239,124,131,.16); color: var(--danger); }
 .status-training, .status-running { background: rgba(121,169,238,.16); color: var(--info); }
 .status-warning { background: rgba(245,189,91,.16); color: var(--warning); }
+.production-badge { background: rgba(87,199,163,.2); border: 1px solid rgba(87,199,163,.55); border-radius: 6px; color: #9ff0d0; display: inline-block; font-size: .7rem; font-weight: 800; letter-spacing: .08em; padding: 4px 8px; }
+.production-heading { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
+.production-heading h2 { margin: 0; }
+.production-panel { border-color: rgba(87,199,163,.45); }
+.production-row { background: rgba(87,199,163,.04); border-bottom: 1px solid var(--border); cursor: default; }
 .gate-list { display: grid; gap: 10px; }
 .gate { align-items: start; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 7px; display: flex; gap: 12px; padding: 12px; }
 .gate.failed { border-left-color: var(--danger); }
