@@ -19,4 +19,8 @@ ENV PYTHONPATH=/opt/mena-mlops-project/src
 
 USER root
 
-RUN chmod +x /usr/local/bin/mena-airflow-entrypoint
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && chmod +x /usr/local/bin/mena-airflow-entrypoint
