@@ -84,11 +84,16 @@ function renderNavigation() {
 function renderDecisionButtons(item) {
   const readOnly = state.currentIsHistory && !state.editing;
   const selected = state.selectedDecision;
-  const selectedLabel = item.review_status === "validated"
-    ? (item.reviewed_label === item.predicted_label ? "Correct" : `Wrong → ${item.reviewed_label}`)
-    : "I don't know";
   if (readOnly) {
-    return `<div class="reviewed-choice"><span class="decision-pill decision-${item.review_status}">${escapeHtml(selectedLabel)}</span>
+    const historicalDecision = item.review_status === "deferred"
+      ? "defer"
+      : item.reviewed_label === item.predicted_label ? "correct" : "wrong";
+    return `<div class="decision-actions">
+      <button class="button decision-button decision-correct ${historicalDecision === "correct" ? "selected" : ""}" disabled>Correct</button>
+      <button class="button decision-button decision-wrong ${historicalDecision === "wrong" ? "selected" : ""}" disabled>Wrong</button>
+      <button class="button decision-button decision-defer ${historicalDecision === "defer" ? "selected" : ""}" disabled>I don't know</button>
+    </div>
+    <div class="reviewed-choice"><span class="muted">${historicalDecision === "defer" ? "Deferred as confusing" : "Annotation saved"}</span>
       <button id="fix-item" class="button button-secondary">Fix it</button></div>`;
   }
   return `<p class="label">Is this prediction correct?</p>
@@ -123,7 +128,7 @@ function renderItem(data) {
     <div class="review-facts">
       <div><span class="label">Model prediction</span><strong>${escapeHtml(item.predicted_label)}</strong></div>
       <div><span class="label">Confidence</span><strong>${(Number(item.confidence) * 100).toFixed(1)}%</strong></div>
-      <div><span class="label">${escapeHtml(item.predicted_label)} pending</span><strong>${classSummary.pending || 0}</strong></div>
+      <div><span class="label">${state.currentIsHistory ? "Annotation status" : `${escapeHtml(item.predicted_label)} pending`}</span><strong>${state.currentIsHistory ? (item.review_status === "deferred" ? "Confusing" : "Reviewed") : classSummary.pending || 0}</strong></div>
     </div>
     <div class="decision-panel">${renderDecisionButtons(item)}</div>`;
   $("#previous-item").addEventListener("click", () => {

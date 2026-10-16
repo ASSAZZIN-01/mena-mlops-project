@@ -47,6 +47,7 @@ body {
 .button-secondary { background: var(--surface-2); color: var(--text); }
 .button-primary { background: var(--accent); border-color: var(--accent); color: #092018; font-weight: 700; }
 .button:disabled { cursor: not-allowed; opacity: .45; }
+.decision-button:disabled.selected { opacity: 1; }
 .button-link { color: var(--info); text-decoration: none; }
 .muted, .empty { color: var(--muted); }
 .hidden { display: none; }
