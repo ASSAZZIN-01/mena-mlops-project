@@ -198,12 +198,9 @@ alert by the Prometheus rules and Grafana dashboard.
 
 ## Feedback and retraining
 
-Review uncertain predictions with:
+Review uncertain predictions in the MLOps Control Center:
 
-```bash
-FEEDBACK_DB=data/feedback/reviewed.db \
-uv run streamlit run scripts/feedback_ui.py
-```
+[`http://localhost:8503/reviewer`](http://localhost:8503/reviewer)
 
 Retraining has two independent triggers. A retraining job is submitted when
 **either** the Evidently/PSI drift report raises an alert **or** all configured
@@ -318,7 +315,7 @@ Open the reviewer dashboard at
 [`http://localhost:8501`](http://localhost:8501). It provides live inference,
 CSV batch inference with progress and download, plus links to Grafana,
 Prometheus, and the automatic feedback review UI at
-[`http://localhost:8502`](http://localhost:8502). Batch CSV files require `text`; `ID` is
+[`http://localhost:8503/reviewer`](http://localhost:8503/reviewer). Batch CSV files require `text`; `ID` is
 generated when absent, and `source` defaults to empty when absent. Load
 testing remains a controlled Locust command rather than a web-triggered
 operation.
@@ -334,7 +331,8 @@ from `.env.example` unless overridden.
 The Compose stack also launches the Redis inference consumer automatically.
 Events published to `reviews:input` are scored with the promoted INT8 model;
 predictions whose confidence is between 25% and 75% are persisted in the
-feedback database for human review at port 8502.
+feedback database for human review in the MLOps Control Center at
+[`http://localhost:8503/reviewer`](http://localhost:8503/reviewer).
 
 All live, batch, and stream predictions are also persisted in the audit
 database at `data/audit/predictions.db`, including their source, input ID,

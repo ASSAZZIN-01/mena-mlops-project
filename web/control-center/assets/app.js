@@ -117,16 +117,19 @@ function renderFeedback() {
       <div class="progress-caption"><span>${reviewed + confusing} of ${suspected} triaged</span><span>${counts[label] || 0} / ${thresholds[label]} validated for retraining</span></div>
     </article>`;
   }).join("");
+  const readinessDescription = "Validated feedback examples are the human-reviewed labels consumed by the retraining gate. The number shown below is how many more validated examples are needed for the next scheduled or manually triggered retraining run.";
   $("#view-feedback").innerHTML = `<article class="panel feedback-guidance"><h2>How feedback moves the model forward</h2>
     <p>Every prediction is recorded by the inference service. Low-confidence predictions enter the suspected queue for human review. Reviewed labels count toward retraining; confusing/deferred items remain visible but do not count toward the retraining gate.</p>
     <div class="feedback-legend"><span><i class="legend-dot reviewed"></i>Reviewed</span><span><i class="legend-dot confusing"></i>Confusing / deferred</span><span><i class="legend-dot pending"></i>Pending</span></div>
-  </article><article class="panel"><h2>Feedback retraining readiness</h2>
+  </article><article class="panel"><h2>Feedback retraining readiness <span class="info-tip" tabindex="0" title="${escapeHtml(readinessDescription)}" aria-label="${escapeHtml(readinessDescription)}">i</span></h2>
     ${Object.keys(thresholds).map((label) => {
       const count = counts[label] || 0; const threshold = thresholds[label] || 1;
-      return `<div style="margin: 16px 0"><div style="display:flex;justify-content:space-between"><span>${escapeHtml(label)}</span><span>${count} / ${threshold}</span></div><div class="progress"><span style="width:${Math.min(100, count / threshold * 100)}%"></span></div></div>`;
+      const remaining = Math.max(0, threshold - count);
+      const status = remaining ? `${remaining} remaining` : "0 remaining · threshold met";
+      return `<div style="margin: 16px 0"><div class="readiness-line"><span>${escapeHtml(label)}</span><span><strong>${status}</strong> <span class="muted">(${count} validated)</span></span></div><div class="progress"><span style="width:${Math.min(100, count / threshold * 100)}%"></span></div></div>`;
     }).join("")}
     <p>${feedback.ready ? '<span class="status status-approved">Ready to retrain</span>' : '<span class="status status-training">Collecting validated feedback</span>'}</p>
-    <a class="button-link" href="${escapeHtml(state.overview.links?.feedback || "#")}" target="_blank">Open reviewer interface →</a>
+    <a class="button-link" href="${escapeHtml(state.overview.links?.feedback || "/reviewer")}" target="_blank">Open reviewer interface →</a>
   </article><section class="feedback-grid">${classCards}</section>`;
 }
 

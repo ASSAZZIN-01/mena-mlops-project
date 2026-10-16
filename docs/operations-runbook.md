@@ -46,7 +46,7 @@ healthy. The main endpoints are:
 | Gateway | http://localhost:8080 |
 | Reviewer dashboard | http://localhost:8501 |
 | MLOps Control Center | http://localhost:8503 |
-| Feedback review | http://localhost:8502 |
+| Feedback review | http://localhost:8503/reviewer |
 | Grafana | http://localhost:3000 |
 | MLflow | http://localhost:5000 |
 | Airflow | http://localhost:8081 |

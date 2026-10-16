@@ -135,7 +135,7 @@ services:
       MLFLOW_PUBLIC_URL: http://localhost:5000
       AIRFLOW_URL: http://localhost:8081
       GRAFANA_URL: http://localhost:3000
-      FEEDBACK_URL: http://localhost:8502
+      FEEDBACK_URL: http://localhost:8503/reviewer
       FEEDBACK_DB: /opt/mena-mlops-project/data/feedback/reviewed.db
       AUDIT_DB: /opt/mena-mlops-project/data/audit/predictions.db
       FEEDBACK_CONFIG: /opt/mena-mlops-project/configs/feedback.yaml
@@ -236,27 +236,6 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 10
-
-  feedback-ui:
-    build: .
-    depends_on:
-      feedback-consumer:
-        condition: service_started
-    environment:
-      FEEDBACK_DB: /data/feedback/reviewed.db
-      AUDIT_DB: /data/audit/predictions.db
-      MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
-    ports:
-      - "8502:8501"
-    volumes:
-      - ./data/feedback:/data/feedback
-      - ./data/audit:/data/audit
-    command:
-      - streamlit
-      - run
-      - scripts/feedback_ui.py
-      - --server.address=0.0.0.0
-      - --server.port=8501
 
   feedback-consumer:
     build:

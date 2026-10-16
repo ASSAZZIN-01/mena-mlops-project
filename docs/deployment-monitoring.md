@@ -225,12 +225,9 @@ merged into the training split only after all configured thresholds are met.
 For the local demonstration, `configs/feedback.yaml` uses temporary `5/1/5`
 thresholds; restore the production `100/20/100` values afterward.
 
-Run the reviewer interface locally with:
+The reviewer interface is served by the MLOps Control Center:
 
-```bash
-FEEDBACK_DB=data/feedback/reviewed.db \
-uv run streamlit run scripts/feedback_ui.py
-```
+[`http://localhost:8503/reviewer`](http://localhost:8503/reviewer)
 
 The Redis inference consumer automatically adds predictions whose maximum
 class probability falls within the configured confidence window to this

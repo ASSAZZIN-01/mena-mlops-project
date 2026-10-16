@@ -13,6 +13,7 @@ import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from mena_mlops.feedback import FeedbackStore
 from mena_mlops.release_registry import ReleaseRegistry
@@ -41,6 +42,12 @@ FEEDBACK_CONFIG = Path(
 )
 registry = ReleaseRegistry(REGISTRY_PATH)
 app = FastAPI(title="MENA MLOps control plane", version="1.0.0")
+
+
+class ReviewSubmission(BaseModel):
+    item_id: int
+    decision: str
+    corrected_label: str | None = None
 
 if STATIC_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
@@ -135,6 +142,55 @@ def feedback() -> dict[str, object]:
     return _feedback_summary()
 
 
+@app.get("/api/reviewer/next")
+def reviewer_next() -> dict[str, object]:
+    store = FeedbackStore(FEEDBACK_DB)
+    item = store.next_pending()
+    summary = _feedback_summary()
+    if item is None:
+        return {"item": None, "queue_position": 0, "queue_total": 0, "summary": summary}
+    pending = summary.get("annotation", {})
+    class_summary = pending.get(item.predicted_label, {})
+    queue_total = sum(
+        int(values.get("pending", 0))
+        for values in pending.values()
+        if isinstance(values, dict)
+    )
+    return {
+        "item": {
+            "id": item.id,
+            "text": item.text,
+            "predicted_label": item.predicted_label,
+            "confidence": item.confidence,
+        },
+        "queue_position": 1,
+        "queue_total": queue_total,
+        "class_summary": class_summary,
+        "summary": summary,
+    }
+
+
+@app.post("/api/reviewer/submit")
+def reviewer_submit(submission: ReviewSubmission) -> dict[str, object]:
+    store = FeedbackStore(FEEDBACK_DB)
+    try:
+        if submission.decision == "correct":
+            store.review(submission.item_id, correct=True)
+        elif submission.decision == "wrong":
+            store.review(
+                submission.item_id,
+                correct=False,
+                corrected_label=submission.corrected_label,
+            )
+        elif submission.decision == "defer":
+            store.defer(submission.item_id)
+        else:
+            raise ValueError("decision must be correct, wrong, or defer")
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return reviewer_next()
+
+
 @app.get("/api/deployments")
 def deployments() -> dict[str, object]:
     releases = registry.list_releases()
@@ -171,6 +227,11 @@ def health() -> dict[str, str]:
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/reviewer")
+def reviewer() -> FileResponse:
+    return FileResponse(STATIC_DIR / "reviewer.html")
 
 
 @app.get("/{path:path}")
