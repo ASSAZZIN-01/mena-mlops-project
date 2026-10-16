@@ -20,6 +20,7 @@ function showError(error) {
 function renderSummary(summary) {
   const annotation = summary.annotation || {};
   const counts = summary.counts || {};
+  const deploymentCounts = summary.deployment_counts || {};
   const thresholds = summary.thresholds || {};
   const pending = labels.reduce((total, label) => total + Number(annotation[label]?.pending || 0), 0);
   const reviewed = labels.reduce((total, label) => total + Number(annotation[label]?.reviewed || 0), 0);
@@ -27,7 +28,8 @@ function renderSummary(summary) {
     ["Pending queue", pending, "Items waiting for a human decision"],
     ["Reviewed", reviewed, "Validated labels saved"],
     ["Next retraining progress", labels.map((label) => `${label}: ${counts[label] || 0}/${thresholds[label] || 0}`).join(" · "), "Validated since the last successful retraining"],
-    ["Retraining gate", summary.ready ? "Ready" : "Collecting", "Validated labels only"],
+    ["Awaiting deployment", labels.map((label) => `${label}: ${deploymentCounts[label] || 0}`).join(" · "), "Feedback since last successful deployment"],
+    ["Retraining gate", summary.ready ? "Ready" : "Collecting", "Validated labels since last attempt"],
   ].map(([label, value, detail]) =>
     `<article class="card"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div><div class="detail">${escapeHtml(detail)}</div></article>`
   ).join("");

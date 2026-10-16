@@ -25,11 +25,19 @@ class FeedbackItem:
 
 @dataclass(frozen=True)
 class RetrainingCheckpoint:
-    """Last successfully consumed feedback and drift event."""
+    """Last feedback included in a completed retraining attempt."""
 
     last_feedback_id: int
     last_drift_fingerprint: str | None
     last_reviewed_at: str | None = None
+
+
+@dataclass(frozen=True)
+class DeploymentCheckpoint:
+    """Last feedback represented by a successfully deployed model."""
+
+    last_feedback_id: int
+    last_reviewed_at: str | None
 
 
 class FeedbackStore:
@@ -94,6 +102,28 @@ class FeedbackStore:
                     WHERE last_reviewed_at IS NULL
                     """
                 )
+            for column, definition in (
+                ("last_attempt_feedback_id", "INTEGER NOT NULL DEFAULT 0"),
+                ("last_attempt_reviewed_at", "TEXT"),
+                ("last_attempt_drift_fingerprint", "TEXT"),
+                ("last_deployed_feedback_id", "INTEGER NOT NULL DEFAULT 0"),
+                ("last_deployed_reviewed_at", "TEXT"),
+            ):
+                if column not in columns:
+                    connection.execute(
+                        f"ALTER TABLE retraining_state ADD COLUMN {column} {definition}"
+                    )
+            connection.execute(
+                """
+                UPDATE retraining_state
+                SET last_attempt_feedback_id = last_feedback_id,
+                    last_attempt_reviewed_at = last_reviewed_at,
+                    last_attempt_drift_fingerprint = last_drift_fingerprint
+                WHERE id = 1
+                  AND last_attempt_feedback_id = 0
+                  AND last_feedback_id != 0
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -297,13 +327,14 @@ class FeedbackStore:
         )
 
     def retraining_checkpoint(self) -> RetrainingCheckpoint:
-        """Return the last successful retraining checkpoint."""
+        """Return the last completed retraining-attempt checkpoint."""
 
         with self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT last_feedback_id, last_drift_fingerprint,
-                       last_reviewed_at
+                SELECT last_attempt_feedback_id AS last_feedback_id,
+                       last_attempt_drift_fingerprint AS last_drift_fingerprint,
+                       last_attempt_reviewed_at AS last_reviewed_at
                 FROM retraining_state
                 WHERE id = 1
                 """
@@ -314,6 +345,24 @@ class FeedbackStore:
             last_feedback_id=int(row["last_feedback_id"]),
             last_drift_fingerprint=row["last_drift_fingerprint"],
             last_reviewed_at=row["last_reviewed_at"],
+        )
+
+    def successful_deployment_checkpoint(self) -> DeploymentCheckpoint:
+        """Return the last feedback represented in production."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT last_deployed_feedback_id, last_deployed_reviewed_at
+                FROM retraining_state
+                WHERE id = 1
+                """
+            ).fetchone()
+        if row is None:
+            return DeploymentCheckpoint(0, None)
+        return DeploymentCheckpoint(
+            last_feedback_id=int(row["last_deployed_feedback_id"]),
+            last_reviewed_at=row["last_deployed_reviewed_at"],
         )
 
     def latest_reviewed_id(self) -> int:
@@ -342,13 +391,13 @@ class FeedbackStore:
             ).fetchone()[0]
         return str(value) if value is not None else None
 
-    def mark_retraining_succeeded(
+    def mark_retraining_attempt(
         self,
         feedback_id: int,
         drift_fingerprint: str | None,
         reviewed_at: str | None = None,
     ) -> None:
-        """Advance the checkpoint after a successful retraining job."""
+        """Advance the attempt cursor after a completed Vertex release attempt."""
 
         if feedback_id < 0:
             raise ValueError("feedback checkpoint cannot be negative")
@@ -357,22 +406,69 @@ class FeedbackStore:
                 """
                 INSERT INTO retraining_state (
                     id, last_feedback_id, last_drift_fingerprint,
-                    last_reviewed_at, updated_at
+                    last_reviewed_at, last_attempt_feedback_id,
+                    last_attempt_drift_fingerprint, last_attempt_reviewed_at,
+                    updated_at
                 )
-                VALUES (1, ?, ?, ?, ?)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     last_feedback_id = excluded.last_feedback_id,
                     last_drift_fingerprint = excluded.last_drift_fingerprint,
                     last_reviewed_at = excluded.last_reviewed_at,
+                    last_attempt_feedback_id = excluded.last_attempt_feedback_id,
+                    last_attempt_drift_fingerprint =
+                        excluded.last_attempt_drift_fingerprint,
+                    last_attempt_reviewed_at = excluded.last_attempt_reviewed_at,
                     updated_at = excluded.updated_at
                 """,
                 (
                     feedback_id,
                     drift_fingerprint,
                     reviewed_at or datetime.now(UTC).isoformat(),
+                    feedback_id,
+                    drift_fingerprint,
+                    reviewed_at or datetime.now(UTC).isoformat(),
                     datetime.now(UTC).isoformat(),
                 ),
             )
+
+    def mark_successful_deployment(
+        self,
+        feedback_id: int,
+        reviewed_at: str | None = None,
+    ) -> None:
+        """Advance the production cursor after deployment and canary success."""
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO retraining_state (
+                    id, last_feedback_id, last_deployed_feedback_id,
+                    last_deployed_reviewed_at, updated_at
+                )
+                VALUES (1, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    last_deployed_feedback_id = excluded.last_deployed_feedback_id,
+                    last_deployed_reviewed_at = excluded.last_deployed_reviewed_at,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    feedback_id,
+                    feedback_id,
+                    reviewed_at or datetime.now(UTC).isoformat(),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+
+    def mark_retraining_succeeded(
+        self,
+        feedback_id: int,
+        drift_fingerprint: str | None,
+        reviewed_at: str | None = None,
+    ) -> None:
+        """Backward-compatible alias for recording a completed attempt."""
+
+        self.mark_retraining_attempt(feedback_id, drift_fingerprint, reviewed_at)
 
     def export_reviewed(
         self,

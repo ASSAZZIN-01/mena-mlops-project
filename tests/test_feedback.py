@@ -153,3 +153,28 @@ def test_late_review_of_older_item_is_counted_after_checkpoint(
         checkpoint.last_feedback_id,
         reviewed_after=checkpoint.last_reviewed_at,
     ) == {"negative": 0, "neutral": 0, "positive": 1}
+
+
+def test_attempt_and_deployment_watermarks_are_independent(tmp_path: Path) -> None:
+    store = FeedbackStore(tmp_path / "feedback.db")
+    first_id = _review(store, "negative")
+    store.mark_retraining_attempt(first_id, "attempt-a", store.latest_reviewed_at())
+    second_id = _review(store, "positive")
+
+    attempt = store.retraining_checkpoint()
+    deployed = store.successful_deployment_checkpoint()
+    assert attempt.last_feedback_id == first_id
+    assert deployed.last_feedback_id == 0
+    assert store.counts_since(
+        attempt.last_feedback_id,
+        reviewed_after=attempt.last_reviewed_at,
+    ) == {"negative": 0, "neutral": 0, "positive": 1}
+
+    store.mark_successful_deployment(first_id, attempt.last_reviewed_at)
+    deployed = store.successful_deployment_checkpoint()
+    assert deployed.last_feedback_id == first_id
+    assert store.counts_since(
+        deployed.last_feedback_id,
+        reviewed_after=deployed.last_reviewed_at,
+    ) == {"negative": 0, "neutral": 0, "positive": 1}
+    assert second_id > first_id

@@ -256,10 +256,14 @@ terminates after training. The training container logs the run through the
 cloud-reachable `MLFLOW_TRACKING_URI` and configured GCS artifact location.
 
 Reviewed feedback is not deleted after retraining. The feedback database stores
-a durable checkpoint containing the highest reviewed feedback ID included in
-the last successful run. Thresholds and exports use only newer reviewed rows,
-and the checkpoint advances only after Vertex reaches `JOB_STATE_SUCCEEDED`.
-If training fails, the same feedback remains eligible for the next retry.
+two durable cursors: the last completed retraining attempt, which prevents an
+unchanged batch from retriggering every schedule, and the last successful
+deployment, which identifies feedback not yet represented in production.
+Automatic trigger thresholds use the attempt cursor; the production gap uses
+the deployment cursor. The deployment cursor advances only after the candidate
+passes its gates, deployment completes, and canary verification succeeds.
+If training or deployment fails, production remains unchanged and the feedback
+gap remains visible for the next release attempt.
 Airflow also limits the DAG to one active run so overlapping schedules cannot
 submit the same batch concurrently.
 

@@ -62,19 +62,29 @@ def _feedback_summary() -> dict[str, object]:
         }
         store = FeedbackStore(FEEDBACK_DB)
         checkpoint = store.retraining_checkpoint()
+        deployment_checkpoint = store.successful_deployment_checkpoint()
         counts = store.counts_since(
             checkpoint.last_feedback_id,
             reviewed_after=checkpoint.last_reviewed_at,
         )
+        deployment_counts = store.counts_since(
+            deployment_checkpoint.last_feedback_id,
+            reviewed_after=deployment_checkpoint.last_reviewed_at,
+        )
         return {
             "counts": counts,
             "lifetime_counts": store.counts(),
+            "deployment_counts": deployment_counts,
             "thresholds": thresholds,
             "ready": all(counts[label] >= thresholds[label] for label in thresholds),
             "annotation": store.annotation_summary(AUDIT_DB),
             "checkpoint": {
                 "last_feedback_id": checkpoint.last_feedback_id,
                 "last_reviewed_at": checkpoint.last_reviewed_at,
+            },
+            "successful_deployment_checkpoint": {
+                "last_feedback_id": deployment_checkpoint.last_feedback_id,
+                "last_reviewed_at": deployment_checkpoint.last_reviewed_at,
             },
         }
     except (
@@ -88,9 +98,11 @@ def _feedback_summary() -> dict[str, object]:
             "error": str(error),
             "counts": {},
             "lifetime_counts": {},
+            "deployment_counts": {},
             "thresholds": {},
             "annotation": {},
             "checkpoint": {},
+            "successful_deployment_checkpoint": {},
             "ready": False,
         }
 

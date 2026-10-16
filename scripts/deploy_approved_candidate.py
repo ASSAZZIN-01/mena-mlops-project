@@ -15,6 +15,7 @@ from google.cloud import storage
 
 from mena_mlops.deployment.canary import docker_compose_command
 from mena_mlops.deployment_identity import build_deployment_identity
+from mena_mlops.feedback import FeedbackStore
 from mena_mlops.observability import emit_event
 from mena_mlops.release_registry import ReleaseRegistry
 
@@ -236,11 +237,6 @@ def main() -> None:
             check=True,
             env=environment,
         )
-        _write_deployed_baseline(
-            decision,
-            identity,
-            args.deployed_baseline_path,
-        )
         emit_event("candidate_services_started", "deployment", status="running")
         if not args.manual_canary:
             subprocess.run(
@@ -253,6 +249,11 @@ def main() -> None:
                 check=True,
                 env=environment,
             )
+        _write_deployed_baseline(
+            decision,
+            identity,
+            args.deployed_baseline_path,
+        )
         registry.record_deployment(
             release_id,
             status="deployed",
@@ -260,6 +261,18 @@ def main() -> None:
             "candidate_percent": args.candidate_percent,
             "model_id": identity["model_id"],
             },
+        )
+        feedback_store = FeedbackStore(
+            Path(
+                os.getenv(
+                    "FEEDBACK_DB",
+                    "data/feedback/reviewed.db",
+                )
+            )
+        )
+        feedback_store.mark_successful_deployment(
+            feedback_store.latest_reviewed_id(),
+            reviewed_at=feedback_store.latest_reviewed_at(),
         )
     else:
         emit_event(

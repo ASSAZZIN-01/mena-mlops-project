@@ -176,12 +176,13 @@ def main() -> None:
         for label, value in config["retraining_thresholds"].items()
     }
     store = FeedbackStore(args.database)
-    checkpoint = store.retraining_checkpoint()
+    attempt_checkpoint = store.retraining_checkpoint()
+    deployment_checkpoint = store.successful_deployment_checkpoint()
     feedback_upper_bound = store.latest_reviewed_id()
     feedback_time_upper_bound = store.latest_reviewed_at()
     counts = store.counts_since(
-        checkpoint.last_feedback_id,
-        reviewed_after=checkpoint.last_reviewed_at,
+        attempt_checkpoint.last_feedback_id,
+        reviewed_after=attempt_checkpoint.last_reviewed_at,
     )
     feedback_ready = feedback_thresholds_reached(counts, thresholds)
     drift_summary = (
@@ -192,7 +193,7 @@ def main() -> None:
     current_drift_fingerprint = drift_fingerprint(drift_summary)
     drift_ready = (
         drift_triggered(drift_summary)
-        and current_drift_fingerprint != checkpoint.last_drift_fingerprint
+        and current_drift_fingerprint != attempt_checkpoint.last_drift_fingerprint
     )
     if not args.manual and not (feedback_ready or drift_ready):
         if args.release_decision_output is not None:
@@ -236,9 +237,9 @@ def main() -> None:
     )
     with tempfile_feedback(
         args.database,
-        after_id=checkpoint.last_feedback_id,
+        after_id=deployment_checkpoint.last_feedback_id,
         through_id=feedback_upper_bound,
-        reviewed_after=checkpoint.last_reviewed_at,
+        reviewed_after=deployment_checkpoint.last_reviewed_at,
         reviewed_through=feedback_time_upper_bound,
     ) as feedback_path:
         for split in ("train", "validation", "test"):
@@ -374,14 +375,13 @@ def main() -> None:
         decision=decision,
         payload={"vertex_job_id": job_id},
     )
-    if not args.manual:
-        store.mark_retraining_succeeded(
-            feedback_upper_bound,
-            current_drift_fingerprint
-            if drift_ready
-            else checkpoint.last_drift_fingerprint,
-            reviewed_at=feedback_time_upper_bound,
-        )
+    store.mark_retraining_attempt(
+        feedback_upper_bound,
+        current_drift_fingerprint
+        if drift_ready
+        else attempt_checkpoint.last_drift_fingerprint,
+        reviewed_at=feedback_time_upper_bound,
+    )
 
 
 class tempfile_feedback:

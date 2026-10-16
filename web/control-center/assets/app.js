@@ -18,6 +18,7 @@ function renderSummary() {
   const latest = state.overview.latest_release;
   const feedback = state.overview.feedback || {};
   const counts = feedback.counts || {};
+  const deploymentCounts = feedback.deployment_counts || {};
   const thresholds = feedback.thresholds || {};
   const feedbackText = Object.keys(thresholds).map(
     (label) => `${label}: ${counts[label] || 0}/${thresholds[label]}`
@@ -122,6 +123,7 @@ function renderFeedback() {
     <p>Every prediction is recorded by the inference service. Low-confidence predictions enter the suspected queue for human review. Reviewed labels count toward retraining; confusing/deferred items remain visible but do not count toward the retraining gate.</p>
     <div class="feedback-legend"><span><i class="legend-dot reviewed"></i>Reviewed</span><span><i class="legend-dot confusing"></i>Confusing / deferred</span><span><i class="legend-dot pending"></i>Pending</span></div>
   </article><article class="panel"><h2>Feedback retraining readiness <span class="info-tip" tabindex="0" title="${escapeHtml(readinessDescription)}" aria-label="${escapeHtml(readinessDescription)}">i</span></h2>
+    <p class="muted">Next trigger progress is measured since the last completed retraining attempt. Feedback still awaiting a successful deployment: ${labels.map((label) => `${escapeHtml(label)} ${deploymentCounts[label] || 0}`).join(" · ")}.</p>
     ${Object.keys(thresholds).map((label) => {
       const count = counts[label] || 0; const threshold = thresholds[label] || 1;
       const remaining = Math.max(0, threshold - count);
