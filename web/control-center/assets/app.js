@@ -18,7 +18,6 @@ function renderSummary() {
   const latest = state.overview.latest_release;
   const feedback = state.overview.feedback || {};
   const counts = feedback.counts || {};
-  const deploymentCounts = feedback.deployment_counts || {};
   const thresholds = feedback.thresholds || {};
   const feedbackText = Object.keys(thresholds).map(
     (label) => `${label}: ${counts[label] || 0}/${thresholds[label]}`
@@ -60,6 +59,7 @@ function renderOverview() {
 function renderFeedback() {
   const feedback = state.overview.feedback || {};
   const counts = feedback.counts || {};
+  const deploymentCounts = feedback.deployment_counts || {};
   const thresholds = feedback.thresholds || {};
   const annotation = feedback.annotation || {};
   const labels = Object.keys(thresholds);
