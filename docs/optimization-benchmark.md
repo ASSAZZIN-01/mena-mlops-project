@@ -65,6 +65,36 @@ the response contract in addition to HTTP status. They should be run against
 the selected backend with `LOCUST_HOST` set to the service URL after the
 deployment topology is selected.
 
+## Vectorized serving benchmark
+
+The serving path supports vectorized tokenizer and ONNX Runtime calls through
+the BentoML `predict_batch` API. The scalar `predict` API remains available
+for live traffic. Benchmark both paths and report p50, mean, p95, throughput,
+CPU, and memory; a sequential HTTP upload is not a valid measurement of
+vectorized inference.
+
+The first CPU-only Compose comparison used 10 Locust users for 30 seconds per
+scenario. Batch throughput is normalized to rows per second:
+
+| Scenario | Batch size | p50 request latency | p95 request latency | Rows/sec | Failures |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Scalar `/predict` | 1 | 39 ms | 190 ms | 25.97 | 0% |
+| Vectorized `/predict_batch` | 32 | 1,700 ms | 2,400 ms | 161.22 | 0% |
+| Vectorized `/predict_batch` | 64 | 3,200 ms | 5,100 ms | 169.58 | 0% |
+| Vectorized `/predict_batch` | 128 | 7,600 ms | 8,700 ms | 163.54 | 0% |
+
+Batch size 64 produced the highest throughput, while batch size 32 had the
+better tail latency. Batch inference is clearly superior for offline
+throughput, but it does not replace scalar live inference: a single live
+prediction should not wait for or construct a 32-128 row payload. Scalar
+inference therefore remains intentionally supported.
+
+The Locust CSV and HTML artifacts are written under `reports/locust/`.
+Container resource snapshots during the run were approximately 0.2-0.6% idle
+CPU for the stable/candidate services between samples and 635-652 MiB RSS;
+these snapshots are indicative rather than a substitute for continuous CPU
+and memory profiling.
+
 ## System-level serving benchmark
 
 The same 10-user, 30-second Locust scenario was run against each backend with

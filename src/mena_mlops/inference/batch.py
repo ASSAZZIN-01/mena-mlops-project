@@ -1,4 +1,4 @@
-"""Batch scoring for JSONL and Parquet review datasets."""
+"""Batch scoring for CSV, JSONL, and Parquet review datasets."""
 
 from __future__ import annotations
 
@@ -24,8 +24,10 @@ def read_batch_input(path: Path) -> pd.DataFrame:
         frame = pd.read_parquet(path)
     elif path.suffix.lower() in {".jsonl", ".ndjson"}:
         frame = pd.read_json(path, lines=True)
+    elif path.suffix.lower() == ".csv":
+        frame = pd.read_csv(path)
     else:
-        raise ValueError("batch input must use .parquet, .jsonl, or .ndjson")
+        raise ValueError("batch input must use .csv, .parquet, .jsonl, or .ndjson")
     if "text" not in frame.columns:
         raise ValueError("batch input must contain a 'text' column")
     if frame["text"].isna().any() or (frame["text"].astype(str).str.len() == 0).any():
@@ -36,28 +38,42 @@ def read_batch_input(path: Path) -> pd.DataFrame:
 def predict_batch(
     records: Iterable[dict[str, object]],
     predictor: TextPredictor,
+    *,
+    batch_size: int = 128,
 ) -> list[dict[str, object]]:
     """Score records while preserving their fields and adding prediction metadata."""
 
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
     scored_at = datetime.now(UTC).isoformat()
     results: list[dict[str, object]] = []
-    for record in records:
-        text = str(record["text"])
-        label, probabilities = predictor.predict(text)
-        result = dict(record)
-        result.update(
-            {
-                "prediction": label,
-                "probabilities": json.dumps(
-                    probabilities,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-                "model_version": predictor.model_version,
-                "predicted_at": scored_at,
-            }
+    input_records = list(records)
+    for start in range(0, len(input_records), batch_size):
+        chunk = input_records[start : start + batch_size]
+        texts = [str(record["text"]) for record in chunk]
+        batch_predictor = getattr(predictor, "predict_batch", None)
+        predictions = (
+            batch_predictor(texts)
+            if batch_predictor is not None
+            else [predictor.predict(text) for text in texts]
         )
-        results.append(result)
+        for record, (label, probabilities) in zip(
+            chunk, predictions, strict=True
+        ):
+            result = dict(record)
+            result.update(
+                {
+                    "prediction": label,
+                    "probabilities": json.dumps(
+                        probabilities,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    "model_version": predictor.model_version,
+                    "predicted_at": scored_at,
+                }
+            )
+            results.append(result)
     return results
 
 

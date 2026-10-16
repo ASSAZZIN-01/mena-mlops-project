@@ -86,26 +86,63 @@ def prepare_batch_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return prepared
 
 
-def batch_predict(frame: pd.DataFrame) -> pd.DataFrame:
+def batch_predict(
+    frame: pd.DataFrame,
+    *,
+    feedback_policy: str = "audit_only",
+) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     progress = st.progress(0, text="Starting batch inference")
     total = len(frame)
-    for index, record in enumerate(frame.to_dict(orient="records"), start=1):
-        result = predict(
-            str(record["text"]),
-            source="batch",
-            input_id=str(record["ID"]),
+    batch_size = 128
+    records = frame.to_dict(orient="records")
+    for start in range(0, total, batch_size):
+        chunk = records[start : start + batch_size]
+        request = Request(
+            f"{API_URL}/predict_batch",
+            data=json.dumps(
+                {
+                    "texts": [str(record["text"]) for record in chunk],
+                    "source": "batch",
+                    "input_ids": [str(record["ID"]) for record in chunk],
+                    "feedback_policy": feedback_policy,
+                },
+                ensure_ascii=False,
+            ).encode(),
+            headers={"Content-Type": "application/json", "X-Source": "batch"},
+            method="POST",
         )
-        rows.append(
-            {
-                **record,
-                **result,
-                "probabilities": json.dumps(
-                    result["probabilities"], ensure_ascii=False, sort_keys=True
-                ),
-            }
-        )
-        progress.progress(index / total, text=f"Scored {index}/{total} rows")
+        try:
+            with urlopen(request, timeout=60) as response:
+                decoded = json.load(response)
+                batch_result = (
+                    decoded["predictions"]
+                    if isinstance(decoded, dict)
+                    else decoded
+                )
+        except HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"Batch prediction API returned HTTP {error.code}: {detail}"
+            ) from error
+        except URLError as error:
+            raise RuntimeError(
+                f"Batch prediction API is unavailable: {error.reason}"
+            ) from error
+        for record, result in zip(chunk, batch_result, strict=True):
+            rows.append(
+                {
+                    **record,
+                    **result,
+                    "probabilities": json.dumps(
+                        result["probabilities"],
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                }
+            )
+        completed = min(start + len(chunk), total)
+        progress.progress(completed / total, text=f"Scored {completed}/{total} rows")
     progress.empty()
     return pd.DataFrame(rows)
 
@@ -202,7 +239,10 @@ def main() -> None:
                     render_prediction(result)
 
     with batch_tab:
-        st.write("Upload a CSV with `text` required; `ID` and `source` are optional.")
+        st.write(
+            "Upload a CSV with `text` required; `ID` and `source` are optional. "
+            "Rows are sent in vectorized batches of 128."
+        )
         uploaded = st.file_uploader("Input CSV", type="csv")
         if uploaded is not None:
             try:
@@ -212,9 +252,16 @@ def main() -> None:
                 st.error(str(error))
             else:
                 st.dataframe(frame.head(10), use_container_width=True)
+                reviewable = st.checkbox(
+                    "Send uncertain predictions to the review queue",
+                    value=False,
+                    help="Keep disabled for offline evaluation datasets.",
+                )
                 if st.button("Run batch inference", type="primary"):
                     try:
-                        results = batch_predict(frame)
+                        results = batch_predict(frame, feedback_policy=(
+                            "reviewable" if reviewable else "audit_only"
+                        ))
                     except RuntimeError as error:
                         st.error(str(error))
                     else:

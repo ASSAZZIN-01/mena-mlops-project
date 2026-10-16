@@ -1,7 +1,5 @@
 FROM python:3.13-slim
 
-ARG ONNXRUNTIME_PACKAGE=onnxruntime
-
 WORKDIR /app
 
 RUN pip install --no-cache-dir \
@@ -13,7 +11,7 @@ RUN pip install --no-cache-dir \
     "prometheus-client>=0.26.0" \
     "redis>=5.0" \
     "transformers>=4.45" \
-    "${ONNXRUNTIME_PACKAGE}>=1.18"
+    "onnxruntime>=1.18"
 
 COPY src ./src
 COPY scripts ./scripts

@@ -4,8 +4,10 @@ import numpy as np
 import torch
 
 from mena_mlops.optimization import (
+    benchmark_batch_callable,
     benchmark_callable,
     onnx_predict,
+    onnx_predict_batch,
     quantize_linear_layers,
 )
 
@@ -19,18 +21,31 @@ def test_dynamic_quantization_and_benchmark() -> None:
     assert result["mean_ms"] >= 0
 
 
+def test_batch_benchmark_reports_item_throughput_and_resources() -> None:
+    result = benchmark_batch_callable(
+        lambda: np.zeros((4, 3)),
+        batch_size=4,
+        iterations=2,
+        warmup=1,
+    )
+    assert result["batch_size"] == 4
+    assert result["throughput_rps"] > 0
+    assert result["cpu_ms_per_batch"] >= 0
+    assert result["peak_memory_mb"] >= 0
+
+
 class _Input:
     def __init__(self, name: str) -> None:
         self.name = name
 
 
 class _Tokenizer:
-    def __call__(self, text: str, **_: object) -> dict[str, np.ndarray]:
+    def __call__(self, text: str | list[str], **_: object) -> dict[str, np.ndarray]:
         del text
         return {
-            "input_ids": np.array([[1, 2]], dtype=np.int64),
-            "token_type_ids": np.array([[0, 0]], dtype=np.int64),
-            "attention_mask": np.array([[1, 1]], dtype=np.int64),
+            "input_ids": np.array([[1, 2], [3, 4]], dtype=np.int64),
+            "token_type_ids": np.array([[0, 0], [0, 0]], dtype=np.int64),
+            "attention_mask": np.array([[1, 1], [1, 1]], dtype=np.int64),
         }
 
 
@@ -49,9 +64,15 @@ class _Session:
     ) -> list[np.ndarray]:
         assert outputs == ["logits"]
         assert set(inputs) == {"input_ids", "token_type_ids", "attention_mask"}
-        return [np.array([[0.1, 0.2, 0.7]], dtype=np.float32)]
+        return [np.array([[0.1, 0.2, 0.7], [0.7, 0.2, 0.1]], dtype=np.float32)]
 
 
 def test_onnx_predict_maps_runtime_input_names() -> None:
     logits = onnx_predict(_Session(), _Tokenizer(), "نص")
     assert np.argmax(logits) == 2
+
+
+def test_onnx_predict_batch_returns_batch_logits() -> None:
+    logits = onnx_predict_batch(_Session(), _Tokenizer(), ["نص", "آخر"])
+    assert logits.shape == (2, 3)
+    assert np.argmax(logits, axis=1).tolist() == [2, 0]

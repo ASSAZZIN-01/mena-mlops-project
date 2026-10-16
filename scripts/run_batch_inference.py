@@ -29,9 +29,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--device",
-        choices=("auto", "cpu", "cuda"),
+        choices=("cpu",),
         default=None,
-        help="Inference device; defaults to MODEL_DEVICE or auto",
+        help="Inference device; CPU inference is enforced",
     )
     return parser.parse_args()
 

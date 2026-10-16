@@ -3,16 +3,13 @@ services:
     build:
       context: .
       dockerfile: deploy/inference/Dockerfile
-      args:
-        ONNXRUNTIME_PACKAGE: ${ONNXRUNTIME_PACKAGE:-onnxruntime}
     environment:
       MODEL_BACKEND: ${STABLE_MODEL_BACKEND:-onnx}
       MODEL_PATH: /models/stable
       MODEL_ONNX_PATH: /models/stable/model-int8.onnx
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
-      MODEL_DEVICE: ${INFERENCE_DEVICE:-cpu}
-      ONNX_PROVIDERS: ${ONNX_PROVIDERS:-}
+      MODEL_DEVICE: cpu
       AUDIT_DB: /data/audit/predictions.db
       FEEDBACK_DB: /data/feedback/reviewed.db
     volumes:
@@ -37,16 +34,13 @@ services:
     build:
       context: .
       dockerfile: deploy/inference/Dockerfile
-      args:
-        ONNXRUNTIME_PACKAGE: ${ONNXRUNTIME_PACKAGE:-onnxruntime}
     environment:
       MODEL_BACKEND: ${CANDIDATE_MODEL_BACKEND:-onnx}
       MODEL_PATH: /models/candidate
       MODEL_ONNX_PATH: /models/candidate/${CANDIDATE_MODEL_FILE:-model-int8.onnx}
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${CANDIDATE_MODEL_VERSION:-candidate-v1}
-      MODEL_DEVICE: ${INFERENCE_DEVICE:-cpu}
-      ONNX_PROVIDERS: ${ONNX_PROVIDERS:-}
+      MODEL_DEVICE: cpu
       AUDIT_DB: /data/audit/predictions.db
       FEEDBACK_DB: /data/feedback/reviewed.db
     volumes:
@@ -244,8 +238,6 @@ services:
     build:
       context: .
       dockerfile: deploy/inference/Dockerfile
-      args:
-        ONNXRUNTIME_PACKAGE: ${ONNXRUNTIME_PACKAGE:-onnxruntime}
     depends_on:
       model-stable:
         condition: service_healthy
@@ -257,8 +249,7 @@ services:
       MODEL_ONNX_PATH: /models/stable/model-int8.onnx
       MODEL_TOKENIZER_PATH: /models/tokenizer
       MODEL_VERSION: ${STABLE_MODEL_VERSION:-onnx-int8-v1}
-      MODEL_DEVICE: ${INFERENCE_DEVICE:-cpu}
-      ONNX_PROVIDERS: ${ONNX_PROVIDERS:-}
+      MODEL_DEVICE: cpu
       REDIS_URL: redis://redis:6379/0
       AUDIT_DB: /data/audit/predictions.db
       FEEDBACK_DB: /data/feedback/reviewed.db

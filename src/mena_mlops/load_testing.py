@@ -20,3 +20,11 @@ def valid_prediction_response(body: Any) -> bool:
     return abs(sum(probabilities.values()) - 1.0) <= 0.01 and bool(
         body.get("model_version")
     )
+
+
+def valid_batch_prediction_response(body: Any) -> bool:
+    """Validate the list response returned by the vectorized endpoint."""
+
+    return isinstance(body, list) and bool(body) and all(
+        valid_prediction_response(item) for item in body
+    )

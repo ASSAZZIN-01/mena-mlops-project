@@ -153,12 +153,18 @@ health, and links to Airflow, Grafana, MLflow, Prometheus, and feedback review.
 Rejected releases are shown separately from deployment failures, with the
 measured gate failure reasons and production-preservation status.
 
-Batch scoring supports JSONL and Parquet:
+Batch scoring supports CSV, JSONL, and Parquet. The dashboard sends bounded
+vectorized requests of up to 128 texts and defaults to audit-only feedback, so
+offline evaluation does not fill the human review queue:
 
 ```bash
 uv run python scripts/run_batch_inference.py \
   data/input/reviews.jsonl data/predictions/reviews.jsonl
 ```
+
+The BentoML service exposes `predict_batch` for vectorized inference. It
+preserves per-row audit and Prometheus records and accepts either
+`feedback_policy=audit_only` or `feedback_policy=reviewable`.
 
 Redis Streams uses `reviews:input` and `reviews:predictions`:
 
@@ -290,18 +296,13 @@ consumer services load the published ONNX or INT8 ONNX artifact through a
 configurable ONNX Runtime package:
 
 ```bash
-# CPU (default)
-ONNXRUNTIME_PACKAGE=onnxruntime INFERENCE_DEVICE=cpu docker compose up -d --build
-
-# GPU host with the matching CUDA runtime available
-ONNXRUNTIME_PACKAGE=onnxruntime-gpu \
-INFERENCE_DEVICE=cuda \
-ONNX_PROVIDERS=CUDAExecutionProvider,CPUExecutionProvider \
-docker compose up -d --build model-stable model-candidate
+# CPU-only inference
+docker compose up -d --build model-stable model-candidate feedback-consumer
 ```
 
-The service validates requested providers against the runtime's available
-providers and fails explicitly if a configured GPU provider is unavailable.
+The inference image installs CPU ONNX Runtime and always selects
+`CPUExecutionProvider`. GPU inference is intentionally not part of the local
+serving configuration.
 The inference image never loads the trained PyTorch checkpoint; it uses only
 the promoted ONNX or INT8 ONNX deployment representation.
 
