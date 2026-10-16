@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import re
 import string
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -47,8 +49,9 @@ def run_drift_report(
     reference: pd.DataFrame,
     current: pd.DataFrame,
     output_dir: Path,
+    prometheus_pushgateway_url: str | None = None,
 ) -> dict[str, Any]:
-    """Run Evidently and persist both a human report and machine summary."""
+    """Run Evidently, persist reports, and optionally publish PSI metrics."""
 
     reference_features = build_monitoring_features(reference)
     current_features = build_monitoring_features(current)
@@ -86,14 +89,41 @@ def run_drift_report(
         json.dumps(summary, indent=2) + "\n",
         encoding="utf-8",
     )
-    (output_dir / "psi.prom").write_text(
+    metrics = (
         "# HELP mena_drift_psi Population Stability Index by feature.\n"
         "# TYPE mena_drift_psi gauge\n"
         + "".join(
             f'mena_drift_psi{{feature="{column}"}} {value}\n'
             for column, value in psi_values.items()
         )
-        + f"mena_drift_psi_max {max_psi}\n",
-        encoding="utf-8",
+        + "# HELP mena_drift_psi_max Maximum Population Stability Index.\n"
+        "# TYPE mena_drift_psi_max gauge\n"
+        + f"mena_drift_psi_max {max_psi}\n"
     )
+    (output_dir / "psi.prom").write_text(metrics, encoding="utf-8")
+    if prometheus_pushgateway_url:
+        publish_psi_metrics(prometheus_pushgateway_url, metrics)
     return summary
+
+
+def publish_psi_metrics(pushgateway_url: str, metrics: str) -> None:
+    """Publish the latest PSI metrics to a Prometheus Pushgateway."""
+
+    url = (
+        pushgateway_url.rstrip("/")
+        + "/metrics/job/mena_evidently_drift"
+    )
+    request = urllib.request.Request(
+        url,
+        data=metrics.encode("utf-8"),
+        headers={"Content-Type": "text/plain; version=0.0.4"},
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            if response.status not in {200, 202}:
+                raise RuntimeError(
+                    f"Pushgateway returned unexpected status {response.status}"
+                )
+    except urllib.error.URLError as error:
+        raise RuntimeError(f"Unable to publish PSI metrics to {url}") from error

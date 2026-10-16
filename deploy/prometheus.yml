@@ -17,3 +17,7 @@ scrape_configs:
       - targets: ["model-candidate:8000"]
         labels:
           deployment: candidate
+  - job_name: drift-pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ["pushgateway:9091"]
