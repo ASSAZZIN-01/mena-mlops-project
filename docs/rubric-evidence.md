@@ -15,7 +15,7 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Batch inference | `run_batch_inference.py` and dashboard upload | CSV result with generated ID and optional source behavior |
 | Canary deployment | Nginx weights and `scripts/canary.py` | 5%/20% traffic metrics and model-version counts |
 | Rollback | `scripts/canary.py --rollback` | Stable-only traffic after rollback |
-| Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | Request, latency, error, distribution, confidence, and `mena_drift_psi_max` panels |
+| Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | KPI stats for requests, average/p95 latency, errors, and PSI; class distribution bar/donut charts; average confidence by class; route throughput; batch latency; and service availability |
 | Drift detection | Evidently/PSI report and Airflow DAG | Successful Airflow task and generated report |
 | Feedback loop | Redis consumer and browser reviewer at `/reviewer` | Automatic uncertain example, confirmed Correct/Wrong/I don't know review, revision without duplicates, and deferred status |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |
@@ -57,6 +57,16 @@ evidence session:
   successful production prediction, confidence/probabilities, and model
   version. A neutral live screenshot is intentionally not claimed because the
   deployed baseline did not produce a neutral argmax for the tested examples.
+- Batch dashboard evidence is captured in
+  `docs/evidence/screenshots/02-dashboard-batch.png`; it shows a completed
+  1,225-row CSV scoring run, prediction preview, confidence values, model
+  version, and downloadable output.
+- Feedback reviewer evidence is captured in
+  `docs/evidence/screenshots/03-feedback-review.png`; it shows a pending
+  Arabic item, a Wrong decision with corrected sentiment, saved annotation,
+  reviewed status, and updated retraining progress. The accompanying
+  `03-feedback-review-fix-if-needed.png` capture preserves the pre-submit
+  reviewer state.
 
 ## Screenshot naming
 

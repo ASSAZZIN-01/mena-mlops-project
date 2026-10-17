@@ -179,7 +179,7 @@ They do not inherit the full project dependency environment or install
 PyTorch:
 
 ```text
-deploy/dashboard/Dockerfile       Streamlit and dashboard data dependencies
+deploy/dashboard/Dockerfile       React dashboard build and static serving
 deploy/control-plane/Dockerfile   FastAPI, YAML, and control-plane dependencies
 deploy/inference/Dockerfile       CPU ONNX serving and feedback consumer
 deploy/airflow/Dockerfile         Airflow orchestration and drift dependencies

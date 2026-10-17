@@ -1,147 +1,158 @@
 {
   "title": "MENA Model Monitoring",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
   "panels": [
     {
-      "title": "Total prediction requests",
+      "title": "Total predictions",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "gridPos": {"h": 5, "w": 5, "x": 0, "y": 0},
       "targets": [
         {
-          "expr": "sum(bentoml_service_request_total{endpoint=\"/predict\"})",
-          "legendFormat": "requests"
+          "expr": "sum(increase(mena_model_predictions_total[$__range]))",
+          "legendFormat": "predictions"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "short"}}
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}},
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
     },
     {
       "title": "Average response time",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "gridPos": {"h": 5, "w": 5, "x": 5, "y": 0},
       "targets": [
         {
-          "expr": "sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\"}[5m]))",
+          "expr": "1000 * sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m]))",
           "legendFormat": "average"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "s", "decimals": 4}}
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
     },
     {
       "title": "p95 response time",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "gridPos": {"h": 5, "w": 5, "x": 10, "y": 0},
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict\",http_response_code=\"200\"}[5m])))",
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m])))",
           "legendFormat": "p95"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "s", "decimals": 4}}
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
     },
     {
       "title": "Error rate",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "gridPos": {"h": 5, "w": 5, "x": 15, "y": 0},
       "targets": [
         {
-          "expr": "sum(rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum(rate(bentoml_service_request_total{endpoint=\"/predict\"}[5m]))",
+          "expr": "100 * sum(rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\",http_response_code=~\"5..\"}[5m])) / clamp_min(sum(rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\"}[5m])), 1)",
           "legendFormat": "errors"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 2}}
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 5}]}}},
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
     },
     {
-      "title": "Prediction distribution by argmax label",
-      "type": "piechart",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "title": "Maximum feature PSI",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 0},
+      "targets": [{"expr": "mena_drift_psi_max", "legendFormat": "PSI"}],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 3, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.25}]}}},
+      "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
+    },
+    {
+      "title": "Predictions by class",
+      "type": "barchart",
+      "gridPos": {"h": 9, "w": 10, "x": 0, "y": 5},
       "targets": [
         {
-          "expr": "round(sum by (label) (increase(mena_model_predictions_total[$__range])))",
+          "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
           "legendFormat": "{{label}}"
         }
       ],
-      "options": {
-        "legend": {"displayMode": "table", "placement": "right", "values": ["percent", "value"]},
-        "pieType": "donut",
-        "tooltip": {"mode": "multi"}
-      }
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": [
+        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+      ]},
+      "options": {"orientation": "horizontal", "xTickLabelRotation": 0, "showValue": "always", "legend": {"displayMode": "hidden"}}
     },
     {
-      "title": "Prediction requests by deployment",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "title": "Prediction share",
+      "type": "piechart",
+      "gridPos": {"h": 9, "w": 10, "x": 10, "y": 5},
       "targets": [
         {
-          "expr": "sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
-          "legendFormat": "{{deployment}}"
+          "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
+          "legendFormat": "{{label}}"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "reqps"}}
+      "fieldConfig": {"defaults": {}, "overrides": [
+        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+      ]},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}}
     },
     {
-      "title": "Average confidence by predicted class",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "title": "Average confidence by class",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 10, "x": 0, "y": 14},
       "targets": [
         {
-          "expr": "sum by (label) (rate(mena_model_prediction_confidence_sum[5m])) / sum by (label) (rate(mena_model_prediction_confidence_count[5m]))",
-          "legendFormat": "{{label}} predicted"
+          "expr": "sum by (label) (increase(mena_model_prediction_confidence_sum[$__range])) / sum by (label) (increase(mena_model_prediction_confidence_count[$__range]))",
+          "legendFormat": "{{label}}"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "decimals": 1}, "overrides": [
+        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+      ]},
+      "options": {"orientation": "horizontal", "showValue": "always", "legend": {"displayMode": "hidden"}}
     },
     {
-      "title": "Min and max confidence by predicted class",
+      "title": "Prediction throughput by route",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "gridPos": {"h": 8, "w": 10, "x": 10, "y": 14},
       "targets": [
         {
-          "expr": "mena_model_prediction_confidence_min",
-          "legendFormat": "{{label}} min"
+          "expr": "sum by (endpoint) (rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m]))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 3}},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
+    },
+    {
+      "title": "Batch latency by endpoint",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 10, "x": 0, "y": 22},
+      "targets": [
+        {
+          "expr": "1000 * sum by (endpoint) (rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])) / sum by (endpoint) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m]))",
+          "legendFormat": "{{endpoint}} average"
         },
         {
-          "expr": "mena_model_prediction_confidence_max",
-          "legendFormat": "{{label}} max"
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])))",
+          "legendFormat": "batch p95"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
-    },
-    {
-      "title": "HTTP 5xx error rate by deployment",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 21},
-      "targets": [
-        {
-          "expr": "sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\"}[5m]))",
-          "legendFormat": "{{deployment}}"
-        }
-      ],
-      "fieldConfig": {"defaults": {"unit": "percentunit"}}
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
     },
     {
       "title": "Service availability",
       "type": "stat",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 21},
-      "targets": [
-        {
-          "expr": "min by (deployment) (up{job=~\"model-stable|model-candidate\"})",
-          "legendFormat": "{{deployment}}"
-        }
-      ],
-      "fieldConfig": {"defaults": {"min": 0, "max": 1}}
-    },
-    {
-      "title": "Maximum feature PSI",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 29},
-      "targets": [
-        {
-          "expr": "mena_drift_psi_max",
-          "legendFormat": "max PSI"
-        }
-      ],
-      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.25}]}}}
+      "gridPos": {"h": 8, "w": 10, "x": 10, "y": 22},
+      "targets": [{"expr": "min by (deployment) (up{job=~\"model-stable|model-candidate\"})", "legendFormat": "{{deployment}}"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name"}
     }
   ]
 }
