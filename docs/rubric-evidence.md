@@ -9,7 +9,7 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Reproducible training | `src/mena_mlops/training/` and `configs/training.yaml` | MLflow run with config, metrics, and data summary |
 | Oversampling | Training-only oversampling in `training/data.py` | Class counts before/after and untouched validation/test counts |
 | Experiment tracking | Compose MLflow server and GCS artifact root | MLflow run screenshot plus GCS artifact listing |
-| Model registry | MLflow registered model `mena-mlops-arabert` | Registered version and source run screenshot |
+| Model registry | MLflow registered model `mena-mlops-arabert` | Registered version and source run screenshot; rejected distillation candidates remain unregistered |
 | Optimization | `build_model_variants.py` and `evaluate_model_variants.py` | FP32/INT8 quality and latency comparison |
 | Serving | BentoML stable and candidate services | Gateway health and prediction response |
 | Batch inference | `run_batch_inference.py` and dashboard upload | CSV result with generated ID and optional source behavior |
@@ -41,6 +41,10 @@ evidence session:
   optimization and promotion gates. The student ONNX INT8 representation
   passed the optimization gate but the student quality gate rejected it
   (macro-F1 `0.5246`, neutral F1 `0.0000`), so it was not promoted.
+- The Vertex distillation run records the train, validation, and test splits as
+  MLflow dataset inputs. Each input includes its GCS staging URI, DVC path,
+  full dataset SHA-256, DVC lock checksum, and source commit. The rejected
+  candidate remains an MLflow run/artifact, not a registered deployable model.
 - TensorRT FP16 remains an explicitly isolated GPU comparison path. No
   `trtexec` environment was available for this run, so TensorRT evidence is
   still pending and no synthetic measurements are reported.

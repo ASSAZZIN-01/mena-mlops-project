@@ -4,7 +4,7 @@ set -euo pipefail
 MLFLOW_IMAGE="${MLFLOW_IMAGE:-mena-mlflow:3.16.1}"
 MLFLOW_DATA_DIR="${MLFLOW_DATA_DIR:-$HOME/mlflow/data}"
 MLFLOW_ARTIFACT_LOCATION="${MLFLOW_ARTIFACT_LOCATION:-gs://mena-mlops-project-dvc/mlflow}"
-MLFLOW_ALLOWED_HOSTS="${MLFLOW_ALLOWED_HOSTS:-localhost,127.0.0.1,mlflow-server}"
+MLFLOW_ALLOWED_HOSTS="${MLFLOW_ALLOWED_HOSTS:-localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,mlflow-server}"
 MLFLOW_CORS_ALLOWED_ORIGINS="${MLFLOW_CORS_ALLOWED_ORIGINS:-http://localhost:5000,http://127.0.0.1:5000}"
 
 mkdir -p "$MLFLOW_DATA_DIR"

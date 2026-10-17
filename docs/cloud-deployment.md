@@ -119,7 +119,7 @@ Reconnect after changing the group, then copy or check out this repository's
 
 ```bash
 chmod +x deploy/mlflow/setup_vm.sh
-MLFLOW_ALLOWED_HOSTS="localhost,127.0.0.1,mlflow-server,<VM_EXTERNAL_IP>" \
+MLFLOW_ALLOWED_HOSTS="localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,mlflow-server,<VM_EXTERNAL_IP>,<VM_EXTERNAL_IP>:5000" \
 MLFLOW_CORS_ALLOWED_ORIGINS="http://localhost:5000,http://127.0.0.1:5000,http://<VM_EXTERNAL_IP>:5000" \
   deploy/mlflow/setup_vm.sh
 ```
@@ -156,6 +156,9 @@ MLflow is not an authentication boundary by itself.
 `MLFLOW_CORS_ALLOWED_ORIGINS` must include every browser origin used to open
 the MLflow UI. Without it, the backend APIs remain reachable by `curl` and
 Vertex workers, but the browser UI displays `Cross-origin request blocked`.
+MLflow validates the `Host` header including the port, so the corresponding
+`localhost:5000`, `127.0.0.1:5000`, and `<VM_EXTERNAL_IP>:5000` entries must
+also be present in `MLFLOW_ALLOWED_HOSTS`.
 
 The VM's ephemeral external IP can change after a stop/start. Either reserve a
 static external IP or update `MLFLOW_TRACKING_URI` whenever the address

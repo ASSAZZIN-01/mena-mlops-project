@@ -117,12 +117,14 @@ def main() -> None:
     for split in ("train", "validation", "test"):
         _upload(args.data_dir / f"{split}.parquet", f"{prefix}/{split}.parquet")
     lineage = {
+        "data_prefix": prefix,
         "git_commit": _git_commit(),
         "dvc_lock_sha256": _sha256(Path("dvc.lock")),
         "distillation_config_sha256": _sha256(args.config),
         "teacher_model": str(args.teacher_model),
         "teacher_config_sha256": _sha256(args.teacher_model / "config.json"),
         "training_image": image_uri,
+        "candidate_registry_status": "not_registered_quality_gate_pending",
     }
     lineage_path = args.config.parent / ".vertex-distillation-lineage.json"
     lineage_path.write_text(json.dumps(lineage, indent=2) + "\n", encoding="utf-8")

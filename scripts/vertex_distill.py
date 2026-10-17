@@ -64,6 +64,11 @@ def main() -> None:
         config_path = root / "distillation.yaml"
         _download(os.environ["VERTEX_DISTILLATION_CONFIG_URI"], config_path)
         config = load_yaml(config_path)
+        lineage_uri = os.environ.get("VERTEX_LINEAGE_URI")
+        lineage_path = root / "lineage.json"
+        if lineage_uri:
+            _download(lineage_uri, lineage_path)
+            config["lineage"] = json.loads(lineage_path.read_text())
         config["teacher_model"] = str(teacher_dir)
         config["paths"] = dict(config["paths"])
         config["paths"]["data_dir"] = str(data_dir)
@@ -89,10 +94,7 @@ def main() -> None:
         run_id = run(config_path)
         _upload_tree(root / "student", f"{output_prefix}/student")
         _upload_tree(root / "reports", f"{output_prefix}/reports")
-        lineage_uri = os.environ.get("VERTEX_LINEAGE_URI")
         if lineage_uri:
-            lineage_path = root / "lineage.json"
-            _download(lineage_uri, lineage_path)
             _upload_tree(root / "student", f"{output_prefix}/model-card-inputs")
             (root / "reports" / "lineage.json").write_text(
                 json.dumps(json.loads(lineage_path.read_text()), indent=2) + "\n",
