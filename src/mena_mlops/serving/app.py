@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
@@ -83,6 +84,16 @@ CONFIDENCE = Histogram(
     "Prediction confidence emitted by the gateway.",
     ["label", "model_version", "deployment_stage"],
     buckets=(0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0),
+)
+BATCH_REQUESTS = Counter(
+    "mena_model_batch_requests_total",
+    "Successful and failed vectorized prediction requests.",
+    ["route", "status", "model_version", "batch_size"],
+)
+BATCH_LATENCY = Histogram(
+    "mena_model_batch_latency_seconds",
+    "Vectorized prediction request latency in seconds.",
+    ["route", "model_version", "batch_size"],
 )
 
 
@@ -248,6 +259,15 @@ def create_app(predictor: Predictor | None = None) -> FastAPI:
     """Create an app, allowing tests to inject a deterministic predictor."""
 
     app = FastAPI(title="MENA sentiment model service", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:8501",
+            "http://127.0.0.1:8501",
+        ],
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
     app.state.predictor = predictor
 
     @app.get("/health", response_model=HealthResponse)
@@ -331,8 +351,11 @@ def create_app(predictor: Predictor | None = None) -> FastAPI:
             raise HTTPException(status_code=503, detail="model is not loaded")
         started = time.perf_counter()
         source = request.headers.get("x-source", "batch")
+        batch_size = str(len(payload.texts))
+        status = "error"
         try:
             predictions = loaded.predict_batch(payload.texts)
+            status = "success"
             return BatchPredictionResponse(
                 predictions=[
                     PredictionResponse(
@@ -344,6 +367,13 @@ def create_app(predictor: Predictor | None = None) -> FastAPI:
                 ]
             )
         except Exception as error:
+            elapsed = time.perf_counter() - started
+            BATCH_REQUESTS.labels(
+                "/predict_batch", status, loaded.model_version, batch_size
+            ).inc()
+            BATCH_LATENCY.labels(
+                "/predict_batch", loaded.model_version, batch_size
+            ).observe(elapsed)
             emit_error(
                 "batch_prediction_failed",
                 "gateway",
@@ -351,9 +381,27 @@ def create_app(predictor: Predictor | None = None) -> FastAPI:
                 source=source,
                 model_version=loaded.model_version,
                 batch_size=len(payload.texts),
-                latency_ms=round((time.perf_counter() - started) * 1000, 3),
+                latency_ms=round(elapsed * 1000, 3),
             )
             raise
+        finally:
+            elapsed = time.perf_counter() - started
+            if status == "success":
+                BATCH_REQUESTS.labels(
+                    "/predict_batch", status, loaded.model_version, batch_size
+                ).inc()
+                BATCH_LATENCY.labels(
+                    "/predict_batch", loaded.model_version, batch_size
+                ).observe(elapsed)
+                emit_event(
+                    "batch_prediction_completed",
+                    "gateway",
+                    status="succeeded",
+                    source=source,
+                    model_version=loaded.model_version,
+                    batch_size=len(payload.texts),
+                    latency_ms=round(elapsed * 1000, 3),
+                )
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> PlainTextResponse:

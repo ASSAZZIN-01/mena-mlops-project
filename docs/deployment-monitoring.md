@@ -5,6 +5,12 @@ BentoML service. Each instance loads one immutable model directory and exposes
 its `MODEL_VERSION` through `/health` and `/predict`. Prometheus scrapes each
 instance separately so stable and candidate traffic can be compared.
 
+`MODEL_VERSION` is the immutable serving-bundle identity (for example,
+`onnx-int8-v1`). It is intentionally separate from MLflow Registry versions:
+`mena-mlops-arabert` version numbers identify registered model records and may
+have several versions for the same serving family. The dashboard displays the
+serving identity returned by the live gateway, not an MLflow registry number.
+
 ## Run one local instance
 
 The trained model must be present locally, either from the MLflow artifact or
@@ -23,6 +29,12 @@ The public gateway exposes:
 - `GET /health` for readiness checks (mapped to BentoML's `/healthz`).
 - `POST /predict` with `{"text": "..."}` for inference.
 - `GET /metrics` for Prometheus scraping.
+
+Successful vectorized requests expose
+`mena_model_batch_requests_total` and
+`mena_model_batch_latency_seconds`, with model-version and batch-size labels.
+The gateway also emits a `batch_prediction_completed` event containing batch
+size and elapsed milliseconds.
 
 BentoML also exposes its service API directly inside the containers. The
 custom `health` method is a POST endpoint; the gateway intentionally uses

@@ -51,6 +51,9 @@ evidence session:
 - The required peer-review text is in `docs/peer-review.md`.
 - README contains the exact three-command reviewer quickstart, final
   architecture diagram, and session changelog.
+- The live dashboard evidence is captured in
+  `docs/evidence/screenshots/01-dashboard-live.png`; it shows a successful
+  production prediction, confidence/probabilities, and model version.
 
 ## Screenshot naming
 
@@ -58,13 +61,15 @@ Use stable names so evidence can be matched to the report:
 
 ```text
 01-dashboard-live.png
-02-dashboard-batch.csv
+02-dashboard-batch.png
 03-feedback-review.png
-04-mlflow-run.png
-05-grafana-canary.png
-06-airflow-success.png
-07-canary-rollback.png
-08-locust-summary.html
+04-mlflow-experiment-overview.png
+05-mlflow-distillation-run.png
+06-grafana-psi-latency.png
+07-airflow-success.png
+08-canary-rollout.png
+09-canary-rollback.png
+10-locust-summary.html
 ```
 
 Screenshots should show the URL or page title where possible. Never include
