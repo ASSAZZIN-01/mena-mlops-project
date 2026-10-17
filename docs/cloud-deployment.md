@@ -120,6 +120,7 @@ Reconnect after changing the group, then copy or check out this repository's
 ```bash
 chmod +x deploy/mlflow/setup_vm.sh
 MLFLOW_ALLOWED_HOSTS="localhost,127.0.0.1,mlflow-server,<VM_EXTERNAL_IP>" \
+MLFLOW_CORS_ALLOWED_ORIGINS="http://localhost:5000,http://127.0.0.1:5000,http://<VM_EXTERNAL_IP>:5000" \
   deploy/mlflow/setup_vm.sh
 ```
 
@@ -151,6 +152,10 @@ cloud-reachable address, not `localhost`.
 The initial demonstration can allow TCP port 5000 from the internet, but this
 should be replaced with HTTPS and authentication before a public deployment.
 MLflow is not an authentication boundary by itself.
+
+`MLFLOW_CORS_ALLOWED_ORIGINS` must include every browser origin used to open
+the MLflow UI. Without it, the backend APIs remain reachable by `curl` and
+Vertex workers, but the browser UI displays `Cross-origin request blocked`.
 
 The VM's ephemeral external IP can change after a stop/start. Either reserve a
 static external IP or update `MLFLOW_TRACKING_URI` whenever the address
