@@ -51,16 +51,20 @@ evidence session:
 - The required peer-review text is in `docs/peer-review.md`.
 - README contains the exact three-command reviewer quickstart, final
   architecture diagram, and session changelog.
-- The live dashboard evidence is captured in
-  `docs/evidence/screenshots/01-dashboard-live.png`; it shows a successful
-  production prediction, confidence/probabilities, and model version.
+- The modern React dashboard live evidence is captured in
+  `docs/evidence/screenshots/01-dashboard-live-positive.png` and
+  `docs/evidence/screenshots/01-dashboard-live-negative.png`; both show a
+  successful production prediction, confidence/probabilities, and model
+  version. A neutral live screenshot is intentionally not claimed because the
+  deployed baseline did not produce a neutral argmax for the tested examples.
 
 ## Screenshot naming
 
 Use stable names so evidence can be matched to the report:
 
 ```text
-01-dashboard-live.png
+01-dashboard-live-positive.png
+01-dashboard-live-negative.png
 02-dashboard-batch.png
 03-feedback-review.png
 04-mlflow-experiment-overview.png
