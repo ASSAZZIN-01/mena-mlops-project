@@ -103,7 +103,13 @@ function App() {
             feedback_policy: reviewable ? "reviewable" : "audit_only",
           }),
         });
-        predictions.push(...response.predictions.map((prediction, index) => ({
+        const batchPredictions = Array.isArray(response)
+          ? response
+          : response?.predictions;
+        if (!Array.isArray(batchPredictions)) {
+          throw new Error("Gateway returned an invalid batch prediction response.");
+        }
+        predictions.push(...batchPredictions.map((prediction, index) => ({
           ...chunk[index], ...prediction,
         })));
         setBatchProgress(Math.round((predictions.length / rows.length) * 100));
