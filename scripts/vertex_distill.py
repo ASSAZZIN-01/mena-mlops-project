@@ -13,7 +13,7 @@ from google.cloud import storage
 
 from mena_mlops.observability import emit_event
 from mena_mlops.training.train import load_yaml
-from scripts.distill_student import run
+from distill_student import run
 
 
 def _download(uri: str, destination: Path) -> None:
