@@ -202,8 +202,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/mena-mlops:${{ github.sha }}
-            ghcr.io/${{ github.repository }}/mena-mlops:main
+            ghcr.io/assazzin-01/mena-mlops-project/mena-mlops:${{ github.sha }}
+            ghcr.io/assazzin-01/mena-mlops-project/mena-mlops:main
 
   publish-training-image:
     name: Delivery • Publish shared training image
