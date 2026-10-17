@@ -205,6 +205,33 @@ jobs:
             ghcr.io/${{ github.repository }}/mena-mlops:${{ github.sha }}
             ghcr.io/${{ github.repository }}/mena-mlops:main
 
+  publish-training-image:
+    name: Delivery • Publish shared training image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [data, lint, tests, model-quality, compose-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: us-central1-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+      - name: Build and publish shared training image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/training/Dockerfile
+          push: true
+          tags: |
+            us-central1-docker.pkg.dev/mena-mlops-project/mena-mlops/training:${{ github.sha }}
+            us-central1-docker.pkg.dev/mena-mlops-project/mena-mlops/training:latest
+
   checks:
     name: checks
     if: ${{ always() }}
