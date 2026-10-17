@@ -8,7 +8,7 @@
     {
       "title": "Total predictions",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 0, "y": 0},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
       "targets": [
         {
           "expr": "sum(increase(mena_model_predictions_total[$__range]))",
@@ -16,12 +16,12 @@
         }
       ],
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}},
-      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
-      "title": "Live latency per row",
+      "title": "Latency p50",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 5, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 8},
       "targets": [
         {
           "expr": "1000 * sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict\",http_response_code=\"200\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
@@ -29,12 +29,12 @@
         }
       ],
       "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
-      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
-      "title": "Live p95 latency per row",
+      "title": "Latency p95",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 10, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 8},
       "targets": [
         {
           "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict\",http_response_code=\"200\"}[5m])))",
@@ -42,12 +42,12 @@
         }
       ],
       "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
-      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
       "title": "Error rate",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 5, "x": 15, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 8},
       "targets": [
         {
           "expr": "100 * sum(rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\",http_response_code=~\"5..\"}[5m])) / clamp_min(sum(rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\"}[5m])), 1)",
@@ -55,45 +55,25 @@
         }
       ],
       "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 5}]}}},
-      "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
       "title": "Maximum feature PSI",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 8},
       "targets": [{"expr": "mena_drift_psi_max", "legendFormat": "PSI"}],
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 3, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.25}]}}},
-      "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
-    },
-    {
-      "title": "Predictions by class (rows)",
-      "type": "barchart",
-      "gridPos": {"h": 9, "w": 10, "x": 0, "y": 5},
-      "targets": [
-        {
-          "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
-          "legendFormat": "{{label}}",
-          "instant": true,
-          "format": "table"
-        }
-      ],
-      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": [
-        {"matcher": {"id": "byRegexp", "options": "/.*positive.*/"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
-        {"matcher": {"id": "byRegexp", "options": "/.*negative.*/"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
-        {"matcher": {"id": "byRegexp", "options": "/.*neutral.*/"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
-      ]},
-      "options": {"orientation": "horizontal", "xTickLabelRotation": 0, "showValue": "always", "legend": {"displayMode": "hidden"}}
+      "options": {"colorMode": "background", "graphMode": "none", "textMode": "value"}
     },
     {
       "title": "Prediction share",
       "type": "piechart",
-      "gridPos": {"h": 9, "w": 10, "x": 10, "y": 5},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
       "targets": [
         {
           "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
           "legendFormat": "{{label}}",
-          "instant": true,
-          "format": "table"
+          "format": "time_series"
         }
       ],
       "fieldConfig": {"defaults": {}, "overrides": [
@@ -105,27 +85,29 @@
     },
     {
       "title": "Average confidence by class",
-      "type": "barchart",
-      "gridPos": {"h": 8, "w": 10, "x": 0, "y": 14},
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
       "targets": [
         {
-          "expr": "sum by (label) (increase(mena_model_prediction_confidence_sum[$__range])) / sum by (label) (increase(mena_model_prediction_confidence_count[$__range]))",
+          "expr": "100 * sum by (label) (increase(mena_model_prediction_confidence_sum[$__range])) / sum by (label) (increase(mena_model_prediction_confidence_count[$__range]))",
           "legendFormat": "{{label}}",
-          "instant": true,
-          "format": "table"
+          "format": "time_series"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "decimals": 1}, "overrides": [
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1, "custom": {"drawStyle": "bars", "barAlignment": 0, "lineWidth": 0, "fillOpacity": 100, "showPoints": "never"}}, "overrides": [
         {"matcher": {"id": "byRegexp", "options": "/.*positive.*/"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
         {"matcher": {"id": "byRegexp", "options": "/.*negative.*/"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
         {"matcher": {"id": "byRegexp", "options": "/.*neutral.*/"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
       ]},
-      "options": {"orientation": "horizontal", "showValue": "always", "legend": {"displayMode": "hidden"}}
+      "options": {
+        "legend": {"displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      }
     },
     {
       "title": "Scored rows per second",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 10, "x": 10, "y": 14},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
       "targets": [
         {
           "expr": "sum(rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
@@ -136,13 +118,13 @@
           "legendFormat": "batch rows/s"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 3}},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 3}},
       "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
     },
     {
       "title": "Batch latency: whole chunk vs effective row",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 10, "x": 0, "y": 22},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
       "targets": [
         {
           "expr": "1000 * sum by (endpoint) (rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])) / sum by (endpoint) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m]))",
@@ -163,14 +145,6 @@
       ],
       "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
       "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
-    },
-    {
-      "title": "Service availability",
-      "type": "stat",
-      "gridPos": {"h": 8, "w": 10, "x": 10, "y": 22},
-      "targets": [{"expr": "min by (deployment) (up{job=~\"model-stable|model-candidate\"})", "legendFormat": "{{deployment}}"}],
-      "fieldConfig": {"defaults": {"min": 0, "max": 1, "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}},
-      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "orientation": "horizontal", "textMode": "value_and_name"}
     }
   ]
 }

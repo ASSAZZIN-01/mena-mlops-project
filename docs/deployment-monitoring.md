@@ -61,12 +61,13 @@ The public model endpoint is available at `http://localhost:8080`. Grafana is
 available at `http://localhost:3000` and Prometheus at
 `http://localhost:9090`.
 
-Grafana distinguishes request latency from row latency. The live `/predict`
-endpoint handles one row per request, while `/predict_batch` handles multiple
-rows per request. The dashboard therefore reports live per-row latency
-separately, shows whole-chunk batch latency, and reports effective batch
-latency per row using `mena_model_batch_row_latency_seconds`. Throughput is
-displayed as scored rows per second rather than HTTP requests per second.
+Grafana distinguishes live request latency from batch latency. The live
+`/predict` endpoint handles one prediction per request, while `/predict_batch`
+handles multiple predictions per request. The dashboard therefore reports
+live p50/p95 request latency separately, shows whole-chunk batch latency, and
+reports effective batch latency per prediction using
+`mena_model_batch_row_latency_seconds`. Throughput is displayed as scored
+predictions per second rather than HTTP requests per second.
 
 The default local traffic split is 95% stable and 5% candidate. It can be
 changed without changing model code:
