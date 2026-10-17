@@ -30,6 +30,10 @@ The public gateway exposes:
 - `POST /predict` with `{"text": "..."}` for inference.
 - `GET /metrics` for Prometheus scraping.
 
+The local React dashboard runs on port 8501 and calls the gateway on port
+8080. The Nginx gateway therefore handles `OPTIONS` preflight requests and
+allows the dashboard origin for `GET` and `POST` inference calls.
+
 Successful vectorized requests expose
 `mena_model_batch_requests_total` and
 `mena_model_batch_latency_seconds`, with model-version and batch-size labels.
