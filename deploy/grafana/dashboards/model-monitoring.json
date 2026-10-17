@@ -71,9 +71,24 @@
       "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
       "targets": [
         {
-          "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
+          "expr": "sum(increase(mena_model_predictions_total{label=\"positive\"}[$__range])) or vector(0)",
           "instant": true,
-          "legendFormat": "{{label}}",
+          "legendFormat": "positive",
+          "refId": "positive",
+          "format": "time_series"
+        },
+        {
+          "expr": "sum(increase(mena_model_predictions_total{label=\"negative\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "negative",
+          "refId": "negative",
+          "format": "time_series"
+        },
+        {
+          "expr": "sum(increase(mena_model_predictions_total{label=\"neutral\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "neutral",
+          "refId": "neutral",
           "format": "time_series"
         }
       ],
@@ -90,9 +105,24 @@
       "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
       "targets": [
         {
-          "expr": "100 * sum by (label) (increase(mena_model_prediction_confidence_sum[$__range])) / sum by (label) (increase(mena_model_prediction_confidence_count[$__range]))",
-          "legendFormat": "{{label}}",
+          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"positive\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"positive\"}[$__range])) or vector(0)",
           "instant": true,
+          "legendFormat": "positive",
+          "refId": "positive",
+          "format": "time_series"
+        },
+        {
+          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"negative\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"negative\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "negative",
+          "refId": "negative",
+          "format": "time_series"
+        },
+        {
+          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"neutral\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"neutral\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "neutral",
+          "refId": "neutral",
           "format": "time_series"
         }
       ],
