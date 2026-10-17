@@ -174,6 +174,24 @@ docker compose up -d --build model-stable model-candidate feedback-consumer
 Provider selection is fixed to `CPUExecutionProvider`; GPU inference is not
 part of the local serving configuration.
 
+The local dashboard and control plane also use dedicated lightweight images.
+They do not inherit the full project dependency environment or install
+PyTorch:
+
+```text
+deploy/dashboard/Dockerfile       Streamlit and dashboard data dependencies
+deploy/control-plane/Dockerfile   FastAPI, YAML, and control-plane dependencies
+deploy/inference/Dockerfile       CPU ONNX serving and feedback consumer
+deploy/airflow/Dockerfile         Airflow orchestration and drift dependencies
+deploy/training/Dockerfile         Vertex GPU training image
+```
+
+Rebuild the service-specific images after changing their dependencies:
+
+```bash
+docker compose build dashboard control-plane model-stable model-candidate
+```
+
 ## 4. Export and compare a candidate
 
 Build deployment variants from the experiment output:
