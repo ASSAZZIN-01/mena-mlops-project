@@ -15,7 +15,7 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Batch inference | `run_batch_inference.py` and dashboard upload | CSV result with generated ID and optional source behavior |
 | Canary deployment | Nginx weights and `scripts/canary.py` | 5%/20% traffic metrics and model-version counts |
 | Rollback | `scripts/canary.py --rollback` | Stable-only traffic after rollback |
-| Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | KPI stats for requests, average/p95 latency, errors, and PSI; class distribution bar/donut charts; average confidence by class; route throughput; batch latency; and service availability |
+| Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | KPI stats for requests, average/p95 latency, errors, and PSI; correctly bounded class-distribution and confidence pie charts; route throughput; batch latency; and service availability |
 | Drift detection | Evidently/PSI report and Airflow DAG | Successful Airflow task and generated report |
 | Feedback loop | Redis consumer and browser reviewer at `/reviewer` | Automatic uncertain example, confirmed Correct/Wrong/I don't know review, revision without duplicates, and deferred status |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |

@@ -72,6 +72,7 @@
       "targets": [
         {
           "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
+          "instant": true,
           "legendFormat": "{{label}}",
           "format": "time_series"
         }
@@ -81,33 +82,29 @@
         {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
         {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
       ]},
-      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}}
+      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
     },
     {
       "title": "Average confidence by class",
-      "type": "barchart",
+      "type": "piechart",
       "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
       "targets": [
         {
           "expr": "100 * sum by (label) (increase(mena_model_prediction_confidence_sum[$__range])) / sum by (label) (increase(mena_model_prediction_confidence_count[$__range]))",
           "legendFormat": "{{label}}",
           "instant": true,
-          "format": "table"
+          "format": "time_series"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1, "custom": {"drawStyle": "bars", "barAlignment": 0, "lineWidth": 0, "fillOpacity": 100, "showPoints": "never"}}, "overrides": [
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1}, "overrides": [
         {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
         {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
         {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
       ]},
-      "transformations": [
-        {"id": "seriesToRows", "options": {}},
-        {"id": "organize", "options": {"excludeByName": {"Time": true}}}
-      ],
       "options": {
-        "orientation": "vertical",
-        "showValue": "always",
-        "legend": {"displayMode": "hidden"}
+        "legend": {"displayMode": "table", "placement": "right", "values": ["value"]},
+        "pieType": "pie",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
       }
     },
     {
