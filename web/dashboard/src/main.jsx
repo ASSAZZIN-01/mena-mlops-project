@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import Papa from "papaparse";
 import "./styles.css";
 
 const API_URL = (import.meta.env.VITE_MODEL_API_URL || "http://localhost:8080").replace(/\/$/, "");
@@ -152,15 +153,22 @@ function App() {
 }
 
 async function parseCsv(file) {
-  const lines = (await file.text()).split(/\r?\n/).filter(Boolean);
-  const headers = lines.shift().split(",").map((header) => header.trim());
-  const textIndex = headers.indexOf("text");
-  if (textIndex < 0) throw new Error("CSV must contain a 'text' column.");
-  return lines.map((line) => {
-    const values = line.split(",");
-    const row = Object.fromEntries(headers.map((header, index) => [header, (values[index] || "").trim()]));
-    if (!row.text) throw new Error("CSV contains an empty text value.");
-    return row;
+  const parsed = Papa.parse(await file.text(), {
+    header: true,
+    skipEmptyLines: true,
+  });
+  if (parsed.errors.length > 0) {
+    throw new Error(`CSV could not be parsed: ${parsed.errors[0].message}`);
+  }
+  if (!parsed.meta.fields?.includes("text")) {
+    throw new Error("CSV must contain a 'text' column.");
+  }
+  return parsed.data.map((row) => {
+    const normalized = Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [key, String(value ?? "").trim()]),
+    );
+    if (!normalized.text) throw new Error("CSV contains an empty text value.");
+    return normalized;
   });
 }
 
