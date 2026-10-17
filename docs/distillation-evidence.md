@@ -78,6 +78,13 @@ The formal gate decision is intentionally recorded as rejected:
 - No registry promotion, candidate deployment, canary, or rollback was
   performed for this student.
 
+The Vertex run now records each DVC split as a first-class MLflow dataset
+input, with the split SHA-256, DVC path, DVC lock checksum, and source commit.
+The student model remains available under the run's `student-model` artifact
+path. It is deliberately not a Model Registry version because the quality
+gate rejected it; the run tag `candidate_registry_status` records this
+decision rather than presenting a rejected benchmark as deployable.
+
 The Vertex report showed a zero-row neutral class because of the worker-side
 evaluation output; the downloaded checkpoint was re-evaluated against the
 canonical local split, which confirmed the actual 55 neutral test rows and is

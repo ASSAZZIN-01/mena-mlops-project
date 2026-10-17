@@ -10,6 +10,7 @@ fi
 
 chown airflow:root /opt/airflow
 mkdir -p /opt/airflow/logs /opt/airflow/plugins
+rm -f /opt/airflow/airflow-webserver.pid
 find /opt/airflow -mindepth 1 -path /opt/airflow/dags -prune -o \
     -exec chown airflow:root {} +
 mkdir -p /opt/mena-mlops-project/reports/drift

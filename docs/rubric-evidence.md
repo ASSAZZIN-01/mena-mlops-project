@@ -9,13 +9,13 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Reproducible training | `src/mena_mlops/training/` and `configs/training.yaml` | MLflow run with config, metrics, and data summary |
 | Oversampling | Training-only oversampling in `training/data.py` | Class counts before/after and untouched validation/test counts |
 | Experiment tracking | Compose MLflow server and GCS artifact root | MLflow run screenshot plus GCS artifact listing |
-| Model registry | MLflow registered model `mena-mlops-arabert` | Registered version and source run screenshot |
+| Model registry | MLflow registered model `mena-mlops-arabert` | Registered version and source run screenshot; rejected distillation candidates remain unregistered |
 | Optimization | `build_model_variants.py` and `evaluate_model_variants.py` | FP32/INT8 quality and latency comparison |
 | Serving | BentoML stable and candidate services | Gateway health and prediction response |
 | Batch inference | `run_batch_inference.py` and dashboard upload | CSV result with generated ID and optional source behavior |
 | Canary deployment | Nginx weights and `scripts/canary.py` | 5%/20% traffic metrics and model-version counts |
 | Rollback | `scripts/canary.py --rollback` | Stable-only traffic after rollback |
-| Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | Request, latency, error, distribution, confidence, and `mena_drift_psi_max` panels |
+| Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | KPI stats for requests, average/p95 latency, errors, and PSI; correctly bounded class-distribution and confidence pie charts; route throughput; batch latency; and service availability |
 | Drift detection | Evidently/PSI report and Airflow DAG | Successful Airflow task and generated report |
 | Feedback loop | Redis consumer and browser reviewer at `/reviewer` | Automatic uncertain example, confirmed Correct/Wrong/I don't know review, revision without duplicates, and deferred status |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |
@@ -41,26 +41,49 @@ evidence session:
   optimization and promotion gates. The student ONNX INT8 representation
   passed the optimization gate but the student quality gate rejected it
   (macro-F1 `0.5246`, neutral F1 `0.0000`), so it was not promoted.
+- The Vertex distillation run records the train, validation, and test splits as
+  MLflow dataset inputs. Each input includes its GCS staging URI, DVC path,
+  full dataset SHA-256, DVC lock checksum, and source commit. The rejected
+  candidate remains an MLflow run/artifact, not a registered deployable model.
 - TensorRT FP16 remains an explicitly isolated GPU comparison path. No
   `trtexec` environment was available for this run, so TensorRT evidence is
   still pending and no synthetic measurements are reported.
 - The required peer-review text is in `docs/peer-review.md`.
 - README contains the exact three-command reviewer quickstart, final
   architecture diagram, and session changelog.
+- The modern React dashboard live evidence is captured in
+  `docs/evidence/screenshots/01-dashboard-live-positive.png` and
+  `docs/evidence/screenshots/01-dashboard-live-negative.png`; both show a
+  successful production prediction, confidence/probabilities, and model
+  version. A neutral live screenshot is intentionally not claimed because the
+  deployed baseline did not produce a neutral argmax for the tested examples.
+- Batch dashboard evidence is captured in
+  `docs/evidence/screenshots/02-dashboard-batch.png`; it shows a completed
+  1,225-row CSV scoring run, prediction preview, confidence values, model
+  version, and downloadable output.
+- Feedback reviewer evidence is captured in
+  `docs/evidence/screenshots/03-feedback-review.png`; it shows a pending
+  Arabic item, a Wrong decision with corrected sentiment, saved annotation,
+  reviewed status, and updated retraining progress. The accompanying
+  `03-feedback-review-fix-if-needed.png` capture preserves the pre-submit
+  reviewer state.
 
 ## Screenshot naming
 
 Use stable names so evidence can be matched to the report:
 
 ```text
-01-dashboard-live.png
-02-dashboard-batch.csv
+01-dashboard-live-positive.png
+01-dashboard-live-negative.png
+02-dashboard-batch.png
 03-feedback-review.png
-04-mlflow-run.png
-05-grafana-canary.png
-06-airflow-success.png
-07-canary-rollback.png
-08-locust-summary.html
+04-mlflow-experiment-overview.png
+05-mlflow-distillation-run.png
+06-grafana-psi-latency.png
+07-airflow-success.png
+08-canary-rollout.png
+09-canary-rollback.png
+10-locust-summary.html
 ```
 
 Screenshots should show the URL or page title where possible. Never include

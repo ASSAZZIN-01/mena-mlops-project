@@ -79,7 +79,7 @@ def test_predict_rejects_empty_text() -> None:
     assert response.status_code == 422
 
 
-def test_predict_batch_returns_one_result_per_text() -> None:
+def test_predict_batch_returns_one_result_per_text(capsys) -> None:
     client = TestClient(create_app(FakePredictor()))
 
     response = client.post(
@@ -94,6 +94,21 @@ def test_predict_batch_returns_one_result_per_text() -> None:
         result["model_version"] == "test-v1"
         for result in response.json()["predictions"]
     )
+    events = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line
+    ]
+    completed = next(
+        event
+        for event in events
+        if event["event_type"] == "batch_prediction_completed"
+    )
+    assert completed["batch_size"] == 2
+    assert completed["model_version"] == "test-v1"
+    metrics = client.get("/metrics").text
+    assert "mena_model_batch_requests_total" in metrics
+    assert "mena_model_batch_latency_seconds" in metrics
 
 
 def test_onnx_provider_defaults_to_cpu() -> None:

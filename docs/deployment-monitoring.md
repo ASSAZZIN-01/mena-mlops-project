@@ -5,6 +5,12 @@ BentoML service. Each instance loads one immutable model directory and exposes
 its `MODEL_VERSION` through `/health` and `/predict`. Prometheus scrapes each
 instance separately so stable and candidate traffic can be compared.
 
+`MODEL_VERSION` is the immutable serving-bundle identity (for example,
+`onnx-int8-v1`). It is intentionally separate from MLflow Registry versions:
+`mena-mlops-arabert` version numbers identify registered model records and may
+have several versions for the same serving family. The dashboard displays the
+serving identity returned by the live gateway, not an MLflow registry number.
+
 ## Run one local instance
 
 The trained model must be present locally, either from the MLflow artifact or
@@ -23,6 +29,16 @@ The public gateway exposes:
 - `GET /health` for readiness checks (mapped to BentoML's `/healthz`).
 - `POST /predict` with `{"text": "..."}` for inference.
 - `GET /metrics` for Prometheus scraping.
+
+The local React dashboard runs on port 8501 and calls the gateway on port
+8080. The Nginx gateway therefore handles `OPTIONS` preflight requests and
+allows the dashboard origin for `GET` and `POST` inference calls.
+
+Successful vectorized requests expose
+`mena_model_batch_requests_total` and
+`mena_model_batch_latency_seconds`, with model-version and batch-size labels.
+The gateway also emits a `batch_prediction_completed` event containing batch
+size and elapsed milliseconds.
 
 BentoML also exposes its service API directly inside the containers. The
 custom `health` method is a POST endpoint; the gateway intentionally uses
@@ -44,6 +60,14 @@ confirm both model services are healthy.
 The public model endpoint is available at `http://localhost:8080`. Grafana is
 available at `http://localhost:3000` and Prometheus at
 `http://localhost:9090`.
+
+Grafana distinguishes live request latency from batch latency. The live
+`/predict` endpoint handles one prediction per request, while `/predict_batch`
+handles multiple predictions per request. The dashboard therefore reports
+live p50/p95 request latency separately, shows whole-chunk batch latency, and
+reports effective batch latency per prediction using
+`mena_model_batch_row_latency_seconds`. Throughput is displayed as scored
+predictions per second rather than HTTP requests per second.
 
 The default local traffic split is 95% stable and 5% candidate. It can be
 changed without changing model code:

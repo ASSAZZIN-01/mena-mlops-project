@@ -43,6 +43,17 @@ CONFIDENCE_MAX = Gauge(
     "Maximum observed probability for each class.",
     ["label", "model_version", "source", "deployment_stage"],
 )
+BATCH_ROWS = Counter(
+    "mena_model_batch_rows_total",
+    "Rows scored by vectorized prediction requests.",
+    ["model_version", "source", "deployment_stage"],
+)
+BATCH_ROW_LATENCY = Histogram(
+    "mena_model_batch_row_latency_seconds",
+    "Effective batch request latency divided by rows scored.",
+    ["model_version", "source", "deployment_stage"],
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
+)
 _confidence_extrema: dict[tuple[str, str], tuple[float, float]] = {}
 _confidence_lock = Lock()
 
@@ -217,6 +228,17 @@ class SentimentService:
                 )
             )
         self.audit_store.record_many(audit_records)
+        elapsed_seconds = time.perf_counter() - started
+        BATCH_ROWS.labels(
+            self.predictor.model_version,
+            source,
+            deployment_stage,
+        ).inc(len(texts))
+        BATCH_ROW_LATENCY.labels(
+            self.predictor.model_version,
+            source,
+            deployment_stage,
+        ).observe(elapsed_seconds / len(texts))
         emit_event(
             "batch_prediction_completed",
             "bentoml",
@@ -227,7 +249,7 @@ class SentimentService:
             model_version=self.predictor.model_version,
             deployment_stage=deployment_stage,
             feedback_policy=feedback_policy,
-            latency_ms=round((time.perf_counter() - started) * 1000, 3),
+            latency_ms=round(elapsed_seconds * 1000, 3),
         )
         return responses
 

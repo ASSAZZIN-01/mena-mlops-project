@@ -160,6 +160,18 @@ async function renderDeployments() {
 async function renderModels() {
   const data = await getJson("/api/models");
   const current = data.current;
+  const mlflow = data.mlflow || {};
+  const latestRun = mlflow.latest_run || {};
+  const runInfo = latestRun.info || {};
+  const mlflowPanel = mlflow.status === "available"
+    ? `<article class="panel"><h2>Latest MLflow experiment</h2>
+      <p><strong>${escapeHtml(mlflow.experiment_name)}</strong></p>
+      <p class="muted">Latest run: ${escapeHtml(runInfo.run_name || runInfo.run_id || "unnamed")}</p>
+      <p>Status: <strong>${escapeHtml(runInfo.status || "unknown")}</strong></p>
+      <p><a class="button-link" href="${escapeHtml(`${data.links.mlflow}/#/experiments/${mlflow.experiment_id}`)}" target="_blank" rel="noreferrer">Open experiment →</a>
+      ${runInfo.run_id ? `<a class="button-link" href="${escapeHtml(`${data.links.mlflow}/#/experiments/${mlflow.experiment_id}/runs/${runInfo.run_id}`)}" target="_blank" rel="noreferrer">Open latest run →</a>` : ""}</p>
+    </article>`
+    : `<article class="panel"><h2>Latest MLflow experiment</h2><p class="empty">${escapeHtml(mlflow.detail || "MLflow experiment is unavailable.")}</p></article>`;
   const links = {
     ...(data.links || {}),
     ...(current?.model_card_uri ? { model_card: current.model_card_uri } : {}),
@@ -169,7 +181,7 @@ async function renderModels() {
   const linkRows = Object.entries(links).map(([name, url]) =>
     `<tr><td>${escapeHtml(name.replaceAll("_", " "))}</td><td><a class="button-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Open →</a></td></tr>`
   ).join("");
-  $("#view-models").innerHTML = `<article class="panel"><h2>Model identity</h2>
+  $("#view-models").innerHTML = `${mlflowPanel}<article class="panel"><h2>Model identity</h2>
     ${current ? `<table><tbody><tr><th>Model ID</th><td>${escapeHtml(current.model_id)}</td></tr><tr><th>Variant</th><td>${escapeHtml(current.selected_variant)}</td></tr><tr><th>Backend</th><td>${escapeHtml(current.hardware?.backend)} / ${escapeHtml(current.hardware?.provider)}</td></tr><tr><th>Macro-F1</th><td>${Number(current.quality?.macro_f1 || 0).toFixed(4)}</td></tr><tr><th>Latency p50</th><td>${latencyMetric(current.latency, "p50_ms")}</td></tr><tr><th>Latency p95</th><td>${latencyMetric(current.latency, "p95_ms")}</td></tr><tr><th>Throughput</th><td>${Number(current.latency?.throughput_rps || 0).toFixed(2)} req/s</td></tr></tbody></table>` : '<p class="empty">No model identity baseline found.</p>'}
   </article><article class="panel"><h2>Model and platform links</h2><table><thead><tr><th>Resource</th><th>Open</th></tr></thead><tbody>${linkRows || '<tr><td colspan="2" class="empty">No external links configured.</td></tr>'}</tbody></table></article><article class="panel"><h2>Candidate history</h2><p class="muted">Use Retraining & releases to inspect every gate and its evidence. This registry currently contains ${data.candidates.length} release record(s).</p></article>`;
 }
