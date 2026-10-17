@@ -21,6 +21,10 @@ COPY scripts ./scripts
 COPY configs ./configs
 
 RUN python3 -m pip install --break-system-packages --no-cache-dir uv \
-    && uv sync --frozen --no-dev
+    && uv sync --frozen --no-dev \
+    && uv pip install \
+        --python /app/.venv/bin/python \
+        --index-url https://download.pytorch.org/whl/cu124 \
+        "torch==2.5.1"
 
 CMD ["python", "scripts/vertex_train.py"]
