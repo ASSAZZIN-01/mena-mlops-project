@@ -37,8 +37,13 @@ evidence session:
 - BentoML includes both explicit vectorized batching and an adaptive
   `batchable=True` API with bounded batch size/latency.
 - The six-layer student model distilled from the twelve-layer AraBERT teacher
-  is part of the model evidence set; retain its exact artifact path and
-  commit hash with the submission bundle.
+  was trained successfully on Vertex AI and evaluated through the project
+  optimization and promotion gates. The student ONNX INT8 representation
+  passed the optimization gate but the student quality gate rejected it
+  (macro-F1 `0.5246`, neutral F1 `0.0000`), so it was not promoted.
+- TensorRT FP16 remains an explicitly isolated GPU comparison path. No
+  `trtexec` environment was available for this run, so TensorRT evidence is
+  still pending and no synthetic measurements are reported.
 - The required peer-review text is in `docs/peer-review.md`.
 - README contains the exact three-command reviewer quickstart, final
   architecture diagram, and session changelog.

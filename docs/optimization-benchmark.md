@@ -47,6 +47,36 @@ the fastest eligible variant is selected. The PyTorch model remains the
 canonical training artifact, and INT8 is promoted only as a deployment
 representation.
 
+## Distilled six-layer student comparison
+
+The project also evaluated the six-layer student produced by the Vertex
+distillation run on the same 1,225-row test split. These are single-request
+CPU measurements from 20 iterations; the student checkpoint was downloaded
+from its recorded GCS artifact and the ONNX variants were generated locally.
+
+| Variant | Accuracy | Macro-F1 | Neutral F1 | Artifact | P50 | P95 | Throughput |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Distilled PyTorch | 0.7820 | 0.5246 | 0.0000 | 371 MB | 32.90 ms | 39.57 ms | 29.72 rows/s |
+| Distilled ONNX FP32 | 0.7820 | 0.5246 | 0.0000 | 371 MB | 20.28 ms | 29.53 ms | 48.36 rows/s |
+| Distilled ONNX INT8 | 0.7829 | 0.5250 | 0.0000 | 93 MB | 6.94 ms | 9.31 ms | 141.09 rows/s |
+
+Student ONNX INT8 is the fastest eligible representation relative to the
+student baseline, with approximately 80% lower mean latency and no macro-F1
+drop. It is not a production candidate because the student quality gate
+rejects the underlying six-layer model: macro-F1 is below the stable floor and
+the neutral-class F1 floor is not met. The existing teacher ONNX INT8 remains
+the production representation.
+
+The student variant checksums are:
+
+- ONNX FP32: `3dd6517358ceb7908c82d145d28c8fb98f189fe89b73cd39bd240258590b4866`
+- ONNX INT8: `7eaac7a4dfd24fc1b75b6bffe179dcdc7634dba5af914d7251bd6ff68b5a15a6`
+
+TensorRT FP16 remains an isolated GPU comparison path, not a fabricated
+result. No `trtexec`-capable TensorRT environment was available during this
+run, so no TensorRT latency, memory, or engine-size number is reported and no
+TensorRT candidate is promoted.
+
 The artifacts and metrics are generated with:
 
 ```bash
