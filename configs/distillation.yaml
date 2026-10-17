@@ -1,0 +1,27 @@
+seed: 42
+
+teacher_model: models/arabert-debug
+student_layers: 6
+alpha: 0.4
+temperature: 4.0
+learning_rate: 0.00003
+batch_size: 16
+eval_batch_size: 32
+max_length: 128
+epochs: 5
+early_stopping_patience: 2
+weight_decay: 0.01
+gradient_accumulation_steps: 1
+device: cuda
+require_gpu: true
+
+paths:
+  data_dir: data/processed
+  output_dir: models/arabert-distilled
+  report_dir: reports/distillation
+
+mlflow:
+  experiment_name: mena-mlops-arabert-gcs
+  tracking_uri: http://localhost:5000
+  artifact_location: gs://mena-mlops-project-dvc/mlflow
+  run_name: arabert-six-layer-distillation
