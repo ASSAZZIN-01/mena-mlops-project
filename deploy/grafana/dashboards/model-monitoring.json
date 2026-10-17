@@ -19,26 +19,26 @@
       "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
     },
     {
-      "title": "Average response time",
+      "title": "Live latency per row",
       "type": "stat",
       "gridPos": {"h": 5, "w": 5, "x": 5, "y": 0},
       "targets": [
         {
-          "expr": "1000 * sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m]))",
-          "legendFormat": "average"
+          "expr": "1000 * sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict\",http_response_code=\"200\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
+          "legendFormat": "one row"
         }
       ],
       "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
       "options": {"colorMode": "value", "graphMode": "area", "textMode": "auto"}
     },
     {
-      "title": "p95 response time",
+      "title": "Live p95 latency per row",
       "type": "stat",
       "gridPos": {"h": 5, "w": 5, "x": 10, "y": 0},
       "targets": [
         {
-          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m])))",
-          "legendFormat": "p95"
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict\",http_response_code=\"200\"}[5m])))",
+          "legendFormat": "one row p95"
         }
       ],
       "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
@@ -66,19 +66,21 @@
       "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
     },
     {
-      "title": "Predictions by class",
+      "title": "Predictions by class (rows)",
       "type": "barchart",
       "gridPos": {"h": 9, "w": 10, "x": 0, "y": 5},
       "targets": [
         {
           "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
-          "legendFormat": "{{label}}"
+          "legendFormat": "{{label}}",
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": [
-        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
-        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
-        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+        {"matcher": {"id": "byRegexp", "options": "/.*positive.*/"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.*negative.*/"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.*neutral.*/"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
       ]},
       "options": {"orientation": "horizontal", "xTickLabelRotation": 0, "showValue": "always", "legend": {"displayMode": "hidden"}}
     },
@@ -89,13 +91,15 @@
       "targets": [
         {
           "expr": "sum by (label) (increase(mena_model_predictions_total[$__range]))",
-          "legendFormat": "{{label}}"
+          "legendFormat": "{{label}}",
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {"defaults": {}, "overrides": [
-        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
-        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
-        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+        {"matcher": {"id": "byRegexp", "options": "/.*positive.*/"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.*negative.*/"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.*neutral.*/"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
       ]},
       "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}}
     },
@@ -106,41 +110,55 @@
       "targets": [
         {
           "expr": "sum by (label) (increase(mena_model_prediction_confidence_sum[$__range])) / sum by (label) (increase(mena_model_prediction_confidence_count[$__range]))",
-          "legendFormat": "{{label}}"
+          "legendFormat": "{{label}}",
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "decimals": 1}, "overrides": [
-        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
-        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
-        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+        {"matcher": {"id": "byRegexp", "options": "/.*positive.*/"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.*negative.*/"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.*neutral.*/"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
       ]},
       "options": {"orientation": "horizontal", "showValue": "always", "legend": {"displayMode": "hidden"}}
     },
     {
-      "title": "Prediction throughput by route",
+      "title": "Scored rows per second",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 10, "x": 10, "y": 14},
       "targets": [
         {
-          "expr": "sum by (endpoint) (rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\",http_response_code=\"200\"}[5m]))",
-          "legendFormat": "{{endpoint}}"
+          "expr": "sum(rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
+          "legendFormat": "live rows/s"
+        },
+        {
+          "expr": "sum(rate(mena_model_batch_rows_total[5m]))",
+          "legendFormat": "batch rows/s"
         }
       ],
       "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 3}},
       "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
     },
     {
-      "title": "Batch latency by endpoint",
+      "title": "Batch latency: whole chunk vs effective row",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 10, "x": 0, "y": 22},
       "targets": [
         {
           "expr": "1000 * sum by (endpoint) (rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])) / sum by (endpoint) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m]))",
-          "legendFormat": "{{endpoint}} average"
+          "legendFormat": "whole chunk average"
         },
         {
           "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])))",
-          "legendFormat": "batch p95"
+          "legendFormat": "whole chunk p95"
+        },
+        {
+          "expr": "1000 * sum(rate(mena_model_batch_row_latency_seconds_sum[5m])) / sum(rate(mena_model_batch_row_latency_seconds_count[5m]))",
+          "legendFormat": "effective row average"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(mena_model_batch_row_latency_seconds_bucket[5m])))",
+          "legendFormat": "effective row p95"
         }
       ],
       "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
