@@ -8,21 +8,21 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Versioned data | DVC and GCS remote in `.dvc/` | `dvc pull`, `dvc repro`, and remote status |
 | Reproducible training | `src/mena_mlops/training/` and `configs/training.yaml` | MLflow run with config, metrics, and data summary |
 | Oversampling | Training-only oversampling in `training/data.py` | Class counts before/after and untouched validation/test counts |
-| Experiment tracking | Compose MLflow server and GCS artifact root | MLflow run screenshot plus GCS artifact listing |
-| Model registry | MLflow registered model `mena-mlops-arabert` | Registered version and source run screenshot; rejected distillation candidates remain unregistered |
+| Experiment tracking | Compose MLflow server and GCS artifact root | [`04-mlflow-experiment-overview.png`](evidence/screenshots/04-mlflow-experiment-overview.png), [`05-mlflow-distillation-run.png`](evidence/screenshots/05-mlflow-distillation-run.png), plus MLflow/GCS artifact listing |
+| Model registry | MLflow registered model `mena-mlops-arabert` | Registered version and source run shown in [`04-mlflow-experiment-overview.png`](evidence/screenshots/04-mlflow-experiment-overview.png); rejected distillation candidates remain unregistered |
 | Optimization | `build_model_variants.py` and `evaluate_model_variants.py` | FP32/INT8 quality and latency comparison |
 | Serving | BentoML stable and candidate services | Gateway health and prediction response |
 | Batch inference | `run_batch_inference.py` and dashboard upload | CSV result with generated ID and optional source behavior |
 | Canary deployment | Nginx weights and `scripts/canary.py` | 5%/20% traffic metrics and model-version counts |
 | Rollback | `scripts/canary.py --rollback` | Stable-only traffic after rollback |
 | Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | KPI stats for requests, average/p95 latency, errors, and PSI; correctly bounded class-distribution pie chart and per-class confidence statistics table; route throughput; batch latency; and service availability |
-| Drift detection | Evidently/PSI report and Airflow DAG | Successful Airflow task and generated report |
+| Drift detection | Evidently/PSI report and Airflow DAG | Fresh `mena_evidently_drift` manual run succeeded on 2026-10-18; generated report remains in `reports/drift/` |
 | Feedback loop | Redis consumer and browser reviewer at `/reviewer` | Automatic uncertain example, confirmed Correct/Wrong/I don't know review, revision without duplicates, and deferred status |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |
 | Retraining gate | `configs/feedback.yaml`, dual feedback cursors, and `submit_vertex_retraining.py` | Threshold check, attempt deduplication, successful-deployment progress, and candidate run when thresholds are met |
 | Release observability | Control Center, release registry, and deployed baseline | Release history, gate failure reasons, `ON PROD` state, model identity, p50/p95 latency, and operational links |
 | CI/CD | `.github/workflows/ci.yml` | Passing visible jobs, Compose smoke job, and registry-delivery configuration |
-| Load testing | Locust scalar and batch scenarios | Final run through Nginx with throughput, p95, and failures |
+| Load testing | Locust scalar and batch scenarios | [`10-locust-summary.html`](evidence/screenshots/10-locust-summary.html) plus scalar/batch CSV summaries |
 
 ## Current implementation evidence
 
@@ -67,6 +67,14 @@ evidence session:
   reviewed status, and updated retraining progress. The accompanying
   `03-feedback-review-fix-if-needed.png` capture preserves the pre-submit
   reviewer state.
+- MLflow experiment and distillation evidence are captured in
+  `04-mlflow-experiment-overview.png` and `05-mlflow-distillation-run.png`.
+- Grafana PSI and latency evidence is captured in
+  `06-grafana-psi-latency.png.png`.
+- Airflow currently exposes the `mena_evidently_drift` DAG and a fresh manual
+  run completed successfully, producing the current Evidently/PSI report.
+- Locust scalar and batch HTML reports are available under `reports/locust/`;
+  the scalar summary is copied to `10-locust-summary.html` for submission.
 
 ## Screenshot naming
 
@@ -91,9 +99,8 @@ credentials, service-account contents, or private tokens.
 
 ## Current known limitations
 
-- Airflow availability and DAG visibility are verified; a successful scheduled
-  task instance still needs to be captured.
-- Candidate deployment and optimization are verified locally; the progressive
-  canary and rollback evidence still needs to be captured.
+- A successful progressive canary rollout and controlled rollback capture still
+  need to be completed; this is intentionally deferred until a stronger
+  candidate is available.
 - The neutral class remains weaker than negative and positive classes and
   should be discussed rather than hidden.
