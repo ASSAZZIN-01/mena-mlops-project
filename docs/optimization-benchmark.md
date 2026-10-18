@@ -116,7 +116,8 @@ scenario. Batch throughput is normalized to rows per second:
 | Vectorized `/predict_batch` | 128 | 7,600 ms | 8,700 ms | 163.54 | 0% |
 
 Batch size 64 produced the highest throughput, while batch size 32 had the
-better tail latency. Batch inference is clearly superior for offline
+better tail latency. The dashboard uses 32-row chunks to prioritize responsive
+progress updates and tail latency. Batch inference is clearly superior for offline
 throughput, but it does not replace scalar live inference: a single live
 prediction should not wait for or construct a 32-128 row payload. Scalar
 inference therefore remains intentionally supported.

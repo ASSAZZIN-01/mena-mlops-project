@@ -7,7 +7,7 @@ import os
 import sqlite3
 from pathlib import Path
 from urllib.error import URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import yaml
 from fastapi import FastAPI, HTTPException
@@ -116,6 +116,57 @@ def _health(url: str) -> dict[str, str]:
             return {"status": "healthy", "detail": str(response.status)}
     except (OSError, URLError) as error:
         return {"status": "unhealthy", "detail": str(error)}
+
+
+def _mlflow_json(path: str, payload: dict[str, object]) -> dict[str, object]:
+    request = Request(
+        os.getenv("MLFLOW_URL", "http://mlflow:5000") + path,
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=3) as response:
+        result = json.load(response)
+    if not isinstance(result, dict):
+        raise ValueError("MLflow returned a non-object response")
+    return result
+
+
+def _latest_mlflow() -> dict[str, object]:
+    experiment_name = "mena-mlops-arabert-gcs"
+    try:
+        experiments = _mlflow_json(
+            "/api/2.0/mlflow/experiments/search",
+            {"max_results": 100},
+        ).get("experiments", [])
+        experiment = next(
+            (
+                entry
+                for entry in experiments
+                if entry.get("name") == experiment_name
+            ),
+            None,
+        )
+        if not isinstance(experiment, dict):
+            return {"status": "unavailable", "detail": "experiment not found"}
+        experiment_id = str(experiment["experiment_id"])
+        runs = _mlflow_json(
+            "/api/2.0/mlflow/runs/search",
+            {
+                "experiment_ids": [experiment_id],
+                "max_results": 1,
+                "order_by": ["attribute.start_time DESC"],
+            },
+        ).get("runs", [])
+        latest = runs[0] if runs else None
+        return {
+            "status": "available",
+            "experiment_id": experiment_id,
+            "experiment_name": experiment_name,
+            "latest_run": latest,
+        }
+    except (OSError, URLError, KeyError, TypeError, ValueError) as error:
+        return {"status": "unavailable", "detail": str(error)}
 
 
 @app.get("/api/overview")
@@ -297,11 +348,13 @@ def models() -> dict[str, object]:
             "current": None,
             "candidates": registry.list_releases(),
             "links": links,
+            "mlflow": _latest_mlflow(),
         }
     return {
         "current": json.loads(baseline_path.read_text(encoding="utf-8")),
         "candidates": registry.list_releases(),
         "links": links,
+        "mlflow": _latest_mlflow(),
     }
 
 

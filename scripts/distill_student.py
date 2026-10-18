@@ -15,6 +15,7 @@ import numpy as np
 import torch
 import yaml
 from dotenv import load_dotenv
+from mlflow.data import from_pandas
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer
 
@@ -91,6 +92,35 @@ def digest(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             checksum.update(chunk)
     return checksum.hexdigest()
+
+
+def log_dataset_lineage(
+    frames: dict[str, Any],
+    data_dir: Path,
+    lineage: dict[str, Any],
+) -> None:
+    """Attach each DVC-tracked split as a first-class MLflow dataset input."""
+    for split, frame in frames.items():
+        parquet_path = data_dir / f"{split}.parquet"
+        dataset = from_pandas(
+            frame,
+            source=(
+                f"{lineage['data_prefix']}/{split}.parquet"
+                if lineage.get("data_prefix")
+                else parquet_path.resolve().as_uri()
+            ),
+            name=f"arabic-reviews-{split}",
+            digest=digest(parquet_path)[:32],
+        )
+        mlflow.log_input(
+            dataset,
+            context="training" if split == "train" else "evaluation",
+            tags={
+                "dvc_path": f"data/processed/{split}.parquet",
+                "dvc_lock_sha256": str(lineage.get("dvc_lock_sha256", "unknown")),
+                "dataset_sha256": digest(parquet_path),
+            },
+        )
 
 
 def build_student(
@@ -254,6 +284,18 @@ def run(config_path: Path) -> str:
     output_dir.mkdir(parents=True, exist_ok=True)
     report_dir.mkdir(parents=True, exist_ok=True)
     with mlflow.start_run(run_name=str(config["mlflow"]["run_name"])) as active_run:
+        lineage = dict(config.get("lineage", {}))
+        mlflow.set_tags(
+            {
+                "dvc_lock_sha256": str(
+                    lineage.get("dvc_lock_sha256", "unknown")
+                ),
+                "dvc_git_commit": str(lineage.get("git_commit", "unknown")),
+                "candidate_registry_status": "not_registered_quality_gate_pending",
+                "model_artifact_path": "student-model",
+            }
+        )
+        log_dataset_lineage(frames, data_dir, lineage)
         mlflow.log_params(
             {
                 "teacher_model": str(teacher_path),

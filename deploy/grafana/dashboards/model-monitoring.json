@@ -1,147 +1,183 @@
 {
   "title": "MENA Model Monitoring",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
   "panels": [
     {
-      "title": "Total prediction requests",
+      "title": "Total predictions",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
       "targets": [
         {
-          "expr": "sum(bentoml_service_request_total{endpoint=\"/predict\"})",
-          "legendFormat": "requests"
+          "expr": "sum(increase(mena_model_predictions_total[$__range]))",
+          "legendFormat": "predictions"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "short"}}
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}},
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
-      "title": "Average response time",
+      "title": "Latency p50",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 8},
       "targets": [
         {
-          "expr": "sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\"}[5m]))",
-          "legendFormat": "average"
+          "expr": "1000 * sum(rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict\",http_response_code=\"200\"}[5m])) / sum(rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
+          "legendFormat": "one row"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "s", "decimals": 4}}
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
-      "title": "p95 response time",
+      "title": "Latency p95",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 8},
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict\",http_response_code=\"200\"}[5m])))",
-          "legendFormat": "p95"
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict\",http_response_code=\"200\"}[5m])))",
+          "legendFormat": "one row p95"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "s", "decimals": 4}}
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
       "title": "Error rate",
       "type": "stat",
-      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 8},
       "targets": [
         {
-          "expr": "sum(rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum(rate(bentoml_service_request_total{endpoint=\"/predict\"}[5m]))",
+          "expr": "100 * sum(rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\",http_response_code=~\"5..\"}[5m])) / clamp_min(sum(rate(bentoml_service_request_total{endpoint=~\"/predict|/predict_batch\"}[5m])), 1)",
           "legendFormat": "errors"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 2}}
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 5}]}}},
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
-      "title": "Prediction distribution by argmax label",
+      "title": "Maximum feature PSI",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 8},
+      "targets": [{"expr": "mena_drift_psi_max", "legendFormat": "PSI"}],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 3, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.25}]}}},
+      "options": {"colorMode": "background", "graphMode": "none", "textMode": "value"}
+    },
+    {
+      "title": "Prediction share",
       "type": "piechart",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
       "targets": [
         {
-          "expr": "round(sum by (label) (increase(mena_model_predictions_total[$__range])))",
-          "legendFormat": "{{label}}"
+          "expr": "sum(increase(mena_model_predictions_total{label=\"positive\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "positive",
+          "refId": "positive",
+          "format": "time_series"
+        },
+        {
+          "expr": "sum(increase(mena_model_predictions_total{label=\"negative\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "negative",
+          "refId": "negative",
+          "format": "time_series"
+        },
+        {
+          "expr": "sum(increase(mena_model_predictions_total{label=\"neutral\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "neutral",
+          "refId": "neutral",
+          "format": "time_series"
         }
       ],
+      "fieldConfig": {"defaults": {}, "overrides": [
+        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+      ]},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "title": "Average confidence by class",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+      "targets": [
+        {
+          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"positive\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"positive\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "positive",
+          "refId": "positive",
+          "format": "time_series"
+        },
+        {
+          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"negative\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"negative\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "negative",
+          "refId": "negative",
+          "format": "time_series"
+        },
+        {
+          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"neutral\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"neutral\"}[$__range])) or vector(0)",
+          "instant": true,
+          "legendFormat": "neutral",
+          "refId": "neutral",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1}, "overrides": [
+        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
+        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
+        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+      ]},
       "options": {
-        "legend": {"displayMode": "table", "placement": "right", "values": ["percent", "value"]},
-        "pieType": "donut",
-        "tooltip": {"mode": "multi"}
+        "legend": {"displayMode": "table", "placement": "right", "values": ["value"]},
+        "pieType": "pie",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
       }
     },
     {
-      "title": "Prediction requests by deployment",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
-      "targets": [
-        {
-          "expr": "sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
-          "legendFormat": "{{deployment}}"
-        }
-      ],
-      "fieldConfig": {"defaults": {"unit": "reqps"}}
-    },
-    {
-      "title": "Average confidence by predicted class",
+      "title": "Scored rows per second",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
       "targets": [
         {
-          "expr": "sum by (label) (rate(mena_model_prediction_confidence_sum[5m])) / sum by (label) (rate(mena_model_prediction_confidence_count[5m]))",
-          "legendFormat": "{{label}} predicted"
+          "expr": "sum(rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
+          "legendFormat": "live rows/s"
+        },
+        {
+          "expr": "sum(rate(mena_model_batch_rows_total[5m]))",
+          "legendFormat": "batch rows/s"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 3}},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
     },
     {
-      "title": "Min and max confidence by predicted class",
+      "title": "Batch latency: whole chunk vs effective row",
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
       "targets": [
         {
-          "expr": "mena_model_prediction_confidence_min",
-          "legendFormat": "{{label}} min"
+          "expr": "1000 * sum by (endpoint) (rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])) / sum by (endpoint) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m]))",
+          "legendFormat": "whole chunk average"
         },
         {
-          "expr": "mena_model_prediction_confidence_max",
-          "legendFormat": "{{label}} max"
-        }
-      ],
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
-    },
-    {
-      "title": "HTTP 5xx error rate by deployment",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 21},
-      "targets": [
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])))",
+          "legendFormat": "whole chunk p95"
+        },
         {
-          "expr": "sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=~\"5..\"}[5m])) / sum by (deployment) (rate(bentoml_service_request_total{endpoint=\"/predict\"}[5m]))",
-          "legendFormat": "{{deployment}}"
-        }
-      ],
-      "fieldConfig": {"defaults": {"unit": "percentunit"}}
-    },
-    {
-      "title": "Service availability",
-      "type": "stat",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 21},
-      "targets": [
+          "expr": "1000 * sum(rate(mena_model_batch_row_latency_seconds_sum[5m])) / sum(rate(mena_model_batch_row_latency_seconds_count[5m]))",
+          "legendFormat": "effective row average"
+        },
         {
-          "expr": "min by (deployment) (up{job=~\"model-stable|model-candidate\"})",
-          "legendFormat": "{{deployment}}"
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(mena_model_batch_row_latency_seconds_bucket[5m])))",
+          "legendFormat": "effective row p95"
         }
       ],
-      "fieldConfig": {"defaults": {"min": 0, "max": 1}}
-    },
-    {
-      "title": "Maximum feature PSI",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 29},
-      "targets": [
-        {
-          "expr": "mena_drift_psi_max",
-          "legendFormat": "max PSI"
-        }
-      ],
-      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.25}]}}}
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
     }
   ]
 }

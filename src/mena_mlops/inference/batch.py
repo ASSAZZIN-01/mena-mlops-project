@@ -17,6 +17,9 @@ class TextPredictor(Protocol):
     def predict(self, text: str) -> tuple[str, dict[str, float]]: ...
 
 
+DEFAULT_BATCH_SIZE = 32
+
+
 def read_batch_input(path: Path) -> pd.DataFrame:
     """Read a batch input and require the canonical ``text`` column."""
 
@@ -39,7 +42,7 @@ def predict_batch(
     records: Iterable[dict[str, object]],
     predictor: TextPredictor,
     *,
-    batch_size: int = 128,
+    batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> list[dict[str, object]]:
     """Score records while preserving their fields and adding prediction metadata."""
 

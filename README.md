@@ -393,6 +393,10 @@ generated when absent, and `source` defaults to empty when absent. Load
 testing remains a controlled Locust command rather than a web-triggered
 operation.
 
+The dashboard is a static React application served by Nginx. It sends
+vectorized requests in 32-row chunks so progress remains responsive; this is
+separate from the Bento adaptive batching maximum of 128 requests.
+
 Grafana, Prometheus, MLflow, PostgreSQL, and Airflow are included in the local Compose stack.
 MLflow uses a persistent Compose volume for its tracking metadata and the
 configured GCS bucket for artifacts.

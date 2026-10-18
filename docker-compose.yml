@@ -89,7 +89,9 @@ services:
       retries: 6
 
   dashboard:
-    build: .
+    build:
+      context: .
+      dockerfile: deploy/dashboard/Dockerfile
     depends_on:
       nginx:
         condition: service_healthy
@@ -101,15 +103,11 @@ services:
       AIRFLOW_URL: ${AIRFLOW_URL:-http://localhost:8081}
     ports:
       - "8501:8501"
-    command:
-      - streamlit
-      - run
-      - scripts/dashboard.py
-      - --server.address=0.0.0.0
-      - --server.port=8501
 
   control-plane:
-    build: .
+    build:
+      context: .
+      dockerfile: deploy/control-plane/Dockerfile
     depends_on:
       nginx:
         condition: service_healthy
