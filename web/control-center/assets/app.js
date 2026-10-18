@@ -53,7 +53,7 @@ function renderOverview() {
       ${state.deployments?.current ? `<article class="panel production-panel">
         <h2>Active production baseline</h2>
         <div class="production-heading">${productionBadge()}<strong>${escapeHtml(state.deployments.current.model_id || "Active model")}</strong></div>
-        <p class="muted">This baseline is active in serving but is not linked to a recorded release lifecycle entry.</p>
+        <p class="muted">${state.deployments.current.release_uri ? `Linked release: ${escapeHtml(state.deployments.current.release_uri)}` : "This baseline is active in serving but is not linked to a recorded release lifecycle entry."}</p>
         <p>Variant: <strong>${escapeHtml(state.deployments.current.selected_variant || "unknown")}</strong> · Macro-F1: <strong>${Number(state.deployments.current.quality?.macro_f1 || 0).toFixed(4)}</strong></p>
         <p class="muted">Latency p95: ${latencyMetric(state.deployments.current.latency, "p95_ms")}</p>
       </article>` : ""}
