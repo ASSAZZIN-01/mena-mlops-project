@@ -50,6 +50,7 @@ def test_registry_allocates_monotonic_model_versions(tmp_path: Path) -> None:
     assert registry.allocate_model_version("release-2") == "v2"
 
     registry.set_model_version_status("v1", "stable")
+    registry.set_registry_version("v1", "19")
     registry.set_model_version_status("v2", "stable")
     assert registry.get_model_release_pointers() == {
         "stable": "v2",
@@ -57,3 +58,4 @@ def test_registry_allocates_monotonic_model_versions(tmp_path: Path) -> None:
     }
     state = registry.release_state()
     assert state["pointers"]["stable"] == "v2"
+    assert state["latest_release"]["registry_version"] is None

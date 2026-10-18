@@ -211,6 +211,9 @@ def main() -> None:
         )
         raise SystemExit("Refusing deployment: release decision is not approved.")
     model_version = registry.allocate_model_version(release_id)
+    registry_version = decision.get("registry_version")
+    if isinstance(registry_version, str) and registry_version.strip():
+        registry.set_registry_version(model_version, registry_version)
     selected_variant = decision.get("selected_variant")
     model_file = {
         "onnx-int8": "model-int8.onnx",
@@ -259,6 +262,7 @@ def main() -> None:
         selected_variant=selected_variant,
         model_file=model_file,
         model_version=model_version,
+        registry_version=registry_version,
         model_id=identity["model_id"],
         model_card_sha256=identity["model_card_sha256"],
     )

@@ -67,6 +67,7 @@ def build_deployment_identity(
         "deployed_model_gate": decision.get("deployed_model_gate"),
         "deployment_stage": "candidate",
         "source_revision": os.getenv("GIT_COMMIT_SHA", "unknown"),
+        "registry_version": decision.get("registry_version"),
         "training_config_sha256": decision.get("training_config_sha256"),
         "deployed_at": datetime.now(UTC).isoformat(),
     }
