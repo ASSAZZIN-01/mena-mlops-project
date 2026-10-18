@@ -57,6 +57,7 @@ class ReleaseRegistry:
                 CREATE TABLE IF NOT EXISTS model_versions (
                     version INTEGER PRIMARY KEY,
                     release_id TEXT NOT NULL UNIQUE,
+                    registry_version TEXT,
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (release_id) REFERENCES releases(release_id)
@@ -69,6 +70,16 @@ class ReleaseRegistry:
                 );
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(model_versions)"
+                ).fetchall()
+            }
+            if "registry_version" not in columns:
+                connection.execute(
+                    "ALTER TABLE model_versions ADD COLUMN registry_version TEXT"
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -203,6 +214,23 @@ class ReleaseRegistry:
                 (status, version_number),
             )
 
+    def set_registry_version(self, version: str, registry_version: str) -> None:
+        if not version.startswith("v") or not version[1:].isdigit():
+            raise ValueError(f"invalid model version: {version}")
+        if not registry_version.strip():
+            raise ValueError("registry version must not be empty")
+        with self._connect() as connection:
+            updated = connection.execute(
+                """
+                UPDATE model_versions
+                SET registry_version = ?
+                WHERE version = ?
+                """,
+                (registry_version.strip(), int(version[1:])),
+            )
+            if updated.rowcount != 1:
+                raise ValueError(f"unknown model version: {version}")
+
     def get_model_release_pointers(self) -> dict[str, str | None]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -238,12 +266,28 @@ class ReleaseRegistry:
                     "release_id": latest["release_id"],
                     "status": latest["status"],
                     "deployment_status": latest["deployment_status"],
+                    "registry_version": self._registry_version(
+                        latest["release_id"]
+                    ),
                 }
                 if latest is not None
                 else None
             ),
             "latest_comparison": comparison,
         }
+
+    def _registry_version(self, release_id: str) -> str | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT registry_version FROM model_versions
+                WHERE release_id = ?
+                """,
+                (release_id,),
+            ).fetchone()
+        if row is None or row["registry_version"] is None:
+            return None
+        return str(row["registry_version"])
 
     def record_decision(
         self,
