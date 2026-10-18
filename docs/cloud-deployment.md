@@ -153,6 +153,57 @@ The initial demonstration can allow TCP port 5000 from the internet, but this
 should be replaced with HTTPS and authentication before a public deployment.
 MLflow is not an authentication boundary by itself.
 
+### Publishing a reviewer-safe serving bundle
+
+The current production release has a dedicated sanitized public serving
+bundle. Its manifest is:
+
+```text
+https://storage.googleapis.com/mena-mlops-public-models/models/clean-candidate-v21/manifest.json
+```
+
+The release source and all lineage metadata remain private under
+`gs://mena-mlops-project-dvc/vertex-staging/`.
+
+Only publish an approved, immutable serving bundle after deciding that its
+model files and tokenizer may be public. Do not make the DVC, MLflow, Vertex
+staging, model-card, or release buckets public. The publication should use a
+dedicated public bucket or prefix containing only:
+
+- the selected ONNX/INT8 model;
+- tokenizer files required by the inference image;
+- a checksum manifest;
+- no raw data, feedback, credentials, or private run metadata.
+
+Before publication, verify the release decision and model-card status locally:
+
+```bash
+uv run python scripts/check_release_readiness.py \
+  --decision gs://mena-mlops-project-dvc/vertex-staging/<release-id>/release/promotion_decision.json
+```
+
+Then run the repository helper from authenticated Cloud Shell. It copies only
+the approved serving files, generates the checksum manifest, and tests the
+exact URL from an unauthenticated request:
+
+```bash
+RELEASE_ID=clean-candidate-v21-20261018-134733 \
+  MODEL_VERSION=clean-candidate-v21 \
+  MLFLOW_VERSION=21 \
+  bash scripts/publish_public_model_bundle.sh
+```
+
+Do not overwrite an existing public release prefix in place. After the
+current production release is published, update the README and reviewer
+evidence with the immutable URL and release ID. After the new manifest has
+verified, the old fixture may be removed explicitly:
+
+```bash
+REMOVE_LEGACY=true bash scripts/publish_public_model_bundle.sh
+```
+
+Only use that option after the v21 manifest has returned successfully.
+
 `MLFLOW_CORS_ALLOWED_ORIGINS` must include every browser origin used to open
 the MLflow UI. Without it, the backend APIs remain reachable by `curl` and
 Vertex workers, but the browser UI displays `Cross-origin request blocked`.

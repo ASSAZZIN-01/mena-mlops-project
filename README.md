@@ -33,6 +33,8 @@ Cloud resources, the MLflow VM, Artifact Registry, and Vertex AI deployment are
 documented in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
 The course-rubric evidence map is in
 [`docs/rubric-evidence.md`](docs/rubric-evidence.md).
+The reviewer walkthrough and reproducibility checklist are in
+[`docs/peer-review.md`](docs/peer-review.md).
 
 ## Reviewer quickstart (exactly three commands)
 
@@ -45,8 +47,12 @@ docker compose up --build -d
 ```
 
 The gateway is then available at `http://localhost:8080`. The model bundle
-command retrieves the public evaluation artifacts only; private credentials
+command retrieves the public reproducibility bundle; private credentials
 are still required for DVC, cloud MLflow artifacts, and Vertex workflows.
+The public bundle is the immutable, sanitized serving bundle for the current
+production release. Its release lineage and MLflow artifacts remain private.
+The one-command publication helper is
+[`scripts/publish_public_model_bundle.sh`](scripts/publish_public_model_bundle.sh).
 
 ## Final architecture
 
@@ -76,30 +82,6 @@ flowchart LR
     N --> RC[Release registry and production baseline]
     RC --> CC[MLOps Control Center]
 ```
-
-This diagram covers the course flow from data/versioning and training through
-registry, optimized serving, canary deployment, monitoring, feedback,
-retraining, and release operations.
-
-## Session changelog
-
-- **Session 1 - reproducible data and training:** DVC data stages, typed
-  training code, locked dependencies, and MLflow lineage.
-- **Session 2 - optimization and serving:** ONNX FP32/INT8 variants, CPU-only
-  BentoML serving, scalar inference, vectorized batch inference, and Locust
-  measurements.
-- **Session 3 - production operations:** Nginx stable/candidate routing,
-  canary weights, rollback, audit provenance, Redis feedback, and reviewer
-  workflows.
-- **Session 4 - monitoring and retraining:** Prometheus/Grafana,
-  Evidently/PSI, Airflow scheduling, feedback thresholds, retraining gates,
-  release registry, and deployment identity.
-- **Session 5 - control and evidence:** MLOps Control Center, model cards,
-  release observability, public health contract, PSI Pushgateway publishing,
-  and submission evidence mapping.
-
-The required peer-review artifact is in
-[`docs/peer-review.md`](docs/peer-review.md).
 
 ## Getting started
 
@@ -219,6 +201,9 @@ operator-facing release history, gate matrix, retraining readiness, service
 health, and links to Airflow, Grafana, MLflow, Prometheus, and feedback review.
 Rejected releases are shown separately from deployment failures, with the
 measured gate failure reasons and production-preservation status.
+When `MLFLOW_TRACKING_URI` points to the GCP MLflow VM, the Control Center
+shows both the local Compose MLflow health and the remote GCP MLflow health;
+experiment and registry links use the configured remote endpoint.
 
 Batch scoring supports CSV, JSONL, and Parquet. The dashboard sends bounded
 vectorized requests of up to 128 texts and defaults to audit-only feedback, so
@@ -376,7 +361,7 @@ the promoted ONNX or INT8 ONNX deployment representation.
 ### Reviewer model bootstrap
 
 Model files are intentionally not committed to Git. Reviewers can download
-the public promoted INT8 bundle and verify its checksums before starting the
+the public serving fixture and verify its checksums before starting the
 deployment:
 
 ```bash
@@ -415,8 +400,13 @@ All live, batch, and stream predictions are also persisted in the audit
 database at `data/audit/predictions.db`, including their source, input ID,
 model version, probabilities, confidence, and review status.
 
-The download contains only the promoted deployment representation and its
-tokenizer. Private DVC and MLflow artifacts remain in the private GCS bucket.
+The download contains only the public INT8 deployment representation and its
+tokenizer. Private DVC, MLflow, model-card, and current-release artifacts
+remain in the private GCS bucket. To reproduce the exact current production
+release rather than the public fixture, an operator must publish the approved
+`clean-candidate-v21` bundle through the controlled GCP release procedure in
+[`docs/cloud-deployment.md`](docs/cloud-deployment.md); do not make the
+private release bucket public.
 
 Compare the original model with dynamic INT8 quantization:
 
