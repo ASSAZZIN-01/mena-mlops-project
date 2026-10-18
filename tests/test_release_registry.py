@@ -55,3 +55,5 @@ def test_registry_allocates_monotonic_model_versions(tmp_path: Path) -> None:
         "stable": "v2",
         "rollback": "v1",
     }
+    state = registry.release_state()
+    assert state["pointers"]["stable"] == "v2"
