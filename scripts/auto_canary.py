@@ -76,8 +76,29 @@ def check_stage(
     max_error_rate: float,
     max_p95_seconds: float,
     probes: int,
+    minimum_observations: int = 10,
+    maximum_relative_regression: float = 0.20,
 ) -> list[str]:
     failures: list[str] = []
+    candidate_observations = _prometheus_value(
+        prometheus_url,
+        'sum(increase(bentoml_service_request_duration_seconds_count{'
+        'job="model-candidate"}[2m]))',
+    )
+    stable_observations = _prometheus_value(
+        prometheus_url,
+        'sum(increase(bentoml_service_request_duration_seconds_count{'
+        'job="model-stable"}[2m]))',
+    )
+    if (
+        candidate_observations is None
+        or stable_observations is None
+        or candidate_observations < minimum_observations
+        or stable_observations < minimum_observations
+    ):
+        failures.append(
+            "insufficient stable/candidate observations for canary decision"
+        )
     candidate_up = _prometheus_value(
         prometheus_url,
         'sum(up{job="model-candidate"})',
@@ -109,6 +130,21 @@ def check_stage(
             f"candidate p95 latency {p95:.3f}s exceeds "
             f"{max_p95_seconds:.3f}s"
         )
+    stable_p95 = _prometheus_value(
+        prometheus_url,
+        'histogram_quantile(0.95, sum by (le) (rate('
+        'bentoml_service_request_duration_seconds_bucket{'
+        'job="model-stable"}[2m])))',
+    )
+    if (
+        p95 is not None
+        and stable_p95 is not None
+        and p95 > stable_p95 * (1 + maximum_relative_regression)
+    ):
+        failures.append(
+            f"candidate p95 latency {p95:.3f}s regresses against stable "
+            f"{stable_p95:.3f}s"
+        )
 
     contract_failure = _check_prediction_contract(gateway_url, probes)
     if contract_failure is not None:
@@ -125,6 +161,8 @@ def run_canary(
     max_error_rate: float = 0.05,
     max_p95_seconds: float = 1.0,
     probes: int = 10,
+    minimum_observations: int = 10,
+    maximum_relative_regression: float = 0.20,
     apply: Callable[[object], None] = apply_split,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
@@ -168,6 +206,8 @@ def run_canary(
             max_error_rate=max_error_rate,
             max_p95_seconds=max_p95_seconds,
             probes=probes,
+            minimum_observations=minimum_observations,
+            maximum_relative_regression=maximum_relative_regression,
         )
         if failures:
             apply(split_for_candidate(0))
@@ -201,9 +241,21 @@ def main() -> None:
     parser.add_argument("--max-error-rate", type=float, default=0.05)
     parser.add_argument("--max-p95-seconds", type=float, default=1.0)
     parser.add_argument("--probes", type=int, default=10)
+    parser.add_argument("--minimum-observations", type=int, default=10)
+    parser.add_argument(
+        "--maximum-relative-regression",
+        type=float,
+        default=0.20,
+        help="Maximum candidate p95 regression versus stable, as a ratio.",
+    )
     args = parser.parse_args()
-    if args.duration_seconds < 0 or args.probes < 1:
-        parser.error("duration must be non-negative and probes must be positive")
+    if (
+        args.duration_seconds < 0
+        or args.probes < 1
+        or args.minimum_observations < 1
+        or args.maximum_relative_regression < 0
+    ):
+        parser.error("canary thresholds must be non-negative and probes positive")
     try:
         run_canary(
             prometheus_url=args.prometheus_url,
@@ -212,6 +264,8 @@ def main() -> None:
             max_error_rate=args.max_error_rate,
             max_p95_seconds=args.max_p95_seconds,
             probes=args.probes,
+            minimum_observations=args.minimum_observations,
+            maximum_relative_regression=args.maximum_relative_regression,
         )
     except Exception as error:
         apply_split(split_for_candidate(0))
