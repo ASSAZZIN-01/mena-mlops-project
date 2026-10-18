@@ -224,6 +224,9 @@ operator-facing release history, gate matrix, retraining readiness, service
 health, and links to Airflow, Grafana, MLflow, Prometheus, and feedback review.
 Rejected releases are shown separately from deployment failures, with the
 measured gate failure reasons and production-preservation status.
+When `MLFLOW_TRACKING_URI` points to the GCP MLflow VM, the Control Center
+shows both the local Compose MLflow health and the remote GCP MLflow health;
+experiment and registry links use the configured remote endpoint.
 
 Batch scoring supports CSV, JSONL, and Parquet. The dashboard sends bounded
 vectorized requests of up to 128 texts and defaults to audit-only feedback, so

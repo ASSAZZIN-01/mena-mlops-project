@@ -29,6 +29,19 @@ The same variables can point training at a deployed MLflow server. Do not
 replace the GCS artifact location with a local Docker volume when collecting
 reproducibility evidence.
 
+The local Compose MLflow service is used for local-stack health and fallback
+experiments. For the authoritative course training runs and model registry,
+set the remote endpoint in `.env`:
+
+```dotenv
+MLFLOW_TRACKING_URI=http://<MLFLOW_VM_EXTERNAL_IP>:5000
+```
+
+The Control Center then reports both `mlflow` (local Compose) and
+`mlflow-gcp` (remote tracking server), while its MLflow experiment and registry
+links target the remote endpoint. MLflow artifacts remain in the configured
+private GCS artifact location.
+
 ## 2. Pull data and start the stack
 
 ```bash

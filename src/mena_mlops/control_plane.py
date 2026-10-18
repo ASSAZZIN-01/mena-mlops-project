@@ -119,9 +119,14 @@ def _health(url: str) -> dict[str, str]:
         return {"status": "unhealthy", "detail": str(error)}
 
 
-def _mlflow_json(path: str, payload: dict[str, object]) -> dict[str, object]:
+def _mlflow_json(
+    path: str,
+    payload: dict[str, object],
+    base_url: str | None = None,
+) -> dict[str, object]:
     request = Request(
-        os.getenv("MLFLOW_URL", "http://mlflow:5000") + path,
+        (base_url or os.getenv("MLFLOW_URL", "http://mlflow:5000")).rstrip("/")
+        + path,
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -135,10 +140,13 @@ def _mlflow_json(path: str, payload: dict[str, object]) -> dict[str, object]:
 
 def _latest_mlflow() -> dict[str, object]:
     experiment_name = "mena-mlops-arabert-gcs"
+    remote_url = os.getenv("MLFLOW_REMOTE_URL", "").strip()
+    source_url = remote_url or os.getenv("MLFLOW_URL", "http://mlflow:5000")
     try:
         experiments = _mlflow_json(
             "/api/2.0/mlflow/experiments/search",
             {"max_results": 100},
+            base_url=source_url,
         ).get("experiments", [])
         experiment = next(
             (
@@ -158,16 +166,26 @@ def _latest_mlflow() -> dict[str, object]:
                 "max_results": 1,
                 "order_by": ["attribute.start_time DESC"],
             },
+            base_url=source_url,
         ).get("runs", [])
         latest = runs[0] if runs else None
         return {
             "status": "available",
             "experiment_id": experiment_id,
             "experiment_name": experiment_name,
+            "source_url": source_url,
             "latest_run": latest,
         }
     except (OSError, URLError, KeyError, TypeError, ValueError) as error:
         return {"status": "unavailable", "detail": str(error)}
+
+
+def _mlflow_public_url() -> str:
+    return (
+        os.getenv("MLFLOW_REMOTE_PUBLIC_URL", "").strip()
+        or os.getenv("MLFLOW_REMOTE_URL", "").strip()
+        or os.getenv("MLFLOW_PUBLIC_URL", "http://localhost:5000")
+    )
 
 
 @app.get("/api/overview")
@@ -186,6 +204,15 @@ def overview() -> dict[str, object]:
             "mlflow": _health(
                 os.getenv("MLFLOW_URL", "http://mlflow:5000") + "/health"
             ),
+            **(
+                {
+                    "mlflow-gcp": _health(
+                        os.getenv("MLFLOW_REMOTE_URL", "").rstrip("/") + "/health"
+                    )
+                }
+                if os.getenv("MLFLOW_REMOTE_URL", "").strip()
+                else {}
+            ),
             "airflow": _health(
                 os.getenv("AIRFLOW_INTERNAL_URL", "http://airflow:8080")
                 + "/health"
@@ -194,7 +221,7 @@ def overview() -> dict[str, object]:
         "links": {
             "airflow": os.getenv("AIRFLOW_URL", "http://localhost:8081"),
             "grafana": os.getenv("GRAFANA_URL", "http://localhost:3000"),
-            "mlflow": os.getenv("MLFLOW_PUBLIC_URL", "http://localhost:5000"),
+            "mlflow": _mlflow_public_url(),
             "feedback": os.getenv("FEEDBACK_URL", "http://localhost:8502"),
             "prometheus": os.getenv(
                 "PROMETHEUS_PUBLIC_URL",
@@ -339,7 +366,7 @@ def deployments() -> dict[str, object]:
 def models() -> dict[str, object]:
     baseline_path = PROJECT_ROOT / "reports" / "retraining" / "deployed_baseline.json"
     links = {
-        "mlflow": os.getenv("MLFLOW_PUBLIC_URL", "http://localhost:5000"),
+        "mlflow": _mlflow_public_url(),
         "airflow": os.getenv("AIRFLOW_URL", "http://localhost:8081"),
         "grafana": os.getenv("GRAFANA_URL", "http://localhost:3000"),
         "prometheus": os.getenv(
