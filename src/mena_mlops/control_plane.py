@@ -77,6 +77,7 @@ def _feedback_summary() -> dict[str, object]:
         return {
             "counts": counts,
             "lifetime_counts": store.counts(),
+            "exclusion_counts": store.exclusion_counts(),
             "deployment_counts": deployment_counts,
             "thresholds": thresholds,
             "ready": all(counts[label] >= thresholds[label] for label in thresholds),
