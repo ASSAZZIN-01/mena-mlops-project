@@ -173,6 +173,7 @@ def _latest_mlflow() -> dict[str, object]:
 def overview() -> dict[str, object]:
     return {
         **registry.overview(),
+        "release_state": registry.release_state(),
         "feedback": _feedback_summary(),
         "services": {
             "gateway": _health(
@@ -205,6 +206,13 @@ def overview() -> dict[str, object]:
 @app.get("/api/releases")
 def releases() -> list[dict[str, object]]:
     return registry.list_releases()
+
+
+@app.get("/api/release-state")
+def release_state() -> dict[str, object]:
+    """Expose promotion pointers and the latest comparison evidence."""
+
+    return registry.release_state()
 
 
 @app.get("/api/releases/{release_id}")

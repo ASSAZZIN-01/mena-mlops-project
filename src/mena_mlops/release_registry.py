@@ -215,6 +215,36 @@ class ReleaseRegistry:
             for row in rows
         }
 
+    def release_state(self) -> dict[str, Any]:
+        with self._connect() as connection:
+            latest = connection.execute(
+                """
+                SELECT release_id, status, decision_json, deployment_status
+                FROM releases
+                ORDER BY started_at DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        comparison: dict[str, Any] | None = None
+        if latest is not None:
+            decision = json.loads(latest["decision_json"] or "{}")
+            value = decision.get("stable_comparison")
+            if isinstance(value, dict):
+                comparison = value
+        return {
+            "pointers": self.get_model_release_pointers(),
+            "latest_release": (
+                {
+                    "release_id": latest["release_id"],
+                    "status": latest["status"],
+                    "deployment_status": latest["deployment_status"],
+                }
+                if latest is not None
+                else None
+            ),
+            "latest_comparison": comparison,
+        }
+
     def record_decision(
         self,
         release_id: str,
