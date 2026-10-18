@@ -18,6 +18,7 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Monitoring | Prometheus/Grafana provisioning and PSI Pushgateway publishing | KPI stats for requests, average/p95 latency, errors, and PSI; correctly bounded class-distribution pie chart and per-class confidence statistics table; route throughput; batch latency; and service availability |
 | Drift detection | Evidently/PSI report and Airflow DAG | Fresh `mena_evidently_drift` manual run succeeded on 2026-10-18; generated report remains in `reports/drift/` |
 | Feedback loop | Redis consumer and browser reviewer at `/reviewer` | Automatic uncertain example, confirmed Correct/Wrong/I don't know review, revision without duplicates, and deferred status |
+| Leakage control | Protected train/validation/test text fingerprints in feedback storage and export | Quarantined-row count, clean feedback export, and no protected text in retraining input |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |
 | Retraining gate | `configs/feedback.yaml`, dual feedback cursors, and `submit_vertex_retraining.py` | Threshold check, attempt deduplication, successful-deployment progress, and candidate run when thresholds are met |
 | Release observability | Control Center, release registry, and deployed baseline | Release history, gate failure reasons, `ON PROD` state, model identity, p50/p95 latency, and operational links |
@@ -75,6 +76,10 @@ evidence session:
   run completed successfully, producing the current Evidently/PSI report.
 - Locust scalar and batch HTML reports are available under `reports/locust/`;
   the scalar summary is copied to `10-locust-summary.html` for submission.
+- Feedback leakage protection is active: historical matches are retained for
+  audit but marked `protected_split_overlap` and excluded from the review queue
+  and retraining export. The current audit quarantined 454 rows; the clean
+  validated export contains 52 rows.
 
 ## Screenshot naming
 

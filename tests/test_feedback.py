@@ -26,6 +26,22 @@ def test_incorrect_review_requires_corrected_label(tmp_path: Path) -> None:
         store.review(item_id, correct=False)
 
 
+def test_protected_feedback_is_excluded_from_queue_and_export(
+    tmp_path: Path,
+) -> None:
+    store = FeedbackStore(
+        tmp_path / "feedback.db",
+        protected_texts={"protected example"},
+    )
+    item_id = store.add_uncertain(" Protected   Example ", "positive", 0.5)
+
+    assert store.next_pending() is None
+    assert store.exclusion_counts() == {"protected_split_overlap": 1}
+    export_path = tmp_path / "feedback.parquet"
+    assert store.export_reviewed(export_path) == 0
+    assert store.get_item(item_id).review_status == "excluded"
+
+
 def test_deferred_feedback_is_not_validated_or_pending(tmp_path: Path) -> None:
     store = FeedbackStore(tmp_path / "feedback.db")
     item_id = store.add_uncertain("نص غامض", "neutral", 0.5)

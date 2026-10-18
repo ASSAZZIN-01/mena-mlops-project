@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -10,6 +11,25 @@ from pathlib import Path
 import pandas as pd
 
 LABELS = ("negative", "neutral", "positive")
+
+
+def normalize_feedback_text(text: str) -> str:
+    return " ".join(str(text).casefold().split())
+
+
+def protected_split_texts(data_dir: Path | None = None) -> set[str]:
+    directory = data_dir or Path(
+        os.getenv("PROTECTED_DATA_DIR", "data/processed")
+    )
+    protected: set[str] = set()
+    for split in ("train", "validation", "test"):
+        path = directory / f"{split}.parquet"
+        if path.is_file():
+            protected.update(
+                normalize_feedback_text(value)
+                for value in pd.read_parquet(path)["text"].dropna()
+            )
+    return protected
 
 
 @dataclass(frozen=True)
@@ -43,8 +63,16 @@ class DeploymentCheckpoint:
 class FeedbackStore:
     """Persist uncertain predictions and reviewed labels in SQLite."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        protected_texts: set[str] | None = None,
+    ) -> None:
         self.path = path
+        self.protected_texts = (
+            protected_texts if protected_texts is not None else protected_split_texts()
+        )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute(
@@ -60,6 +88,7 @@ class FeedbackStore:
                     ),
                     reviewed_at TEXT,
                     review_status TEXT NOT NULL DEFAULT 'pending'
+                    ,excluded_reason TEXT
                 )
                 """
             )
@@ -73,6 +102,10 @@ class FeedbackStore:
                     ALTER TABLE feedback
                     ADD COLUMN review_status TEXT NOT NULL DEFAULT 'pending'
                     """
+                )
+            if "excluded_reason" not in columns:
+                connection.execute(
+                    "ALTER TABLE feedback ADD COLUMN excluded_reason TEXT"
                 )
             connection.execute(
                 """
@@ -144,15 +177,53 @@ class FeedbackStore:
             raise ValueError(f"unsupported predicted label: {predicted_label}")
         if not 0 <= confidence <= 1:
             raise ValueError("confidence must be between 0 and 1")
+        excluded_reason = (
+            "protected_split_overlap"
+            if normalize_feedback_text(text) in self.protected_texts
+            else None
+        )
         with self._connect() as connection:
             cursor = connection.execute(
                 """
-                INSERT INTO feedback (text, predicted_label, confidence)
-                VALUES (?, ?, ?)
+                INSERT INTO feedback
+                    (text, predicted_label, confidence, review_status,
+                     excluded_reason)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (text, predicted_label, confidence),
+                (
+                    text,
+                    predicted_label,
+                    confidence,
+                    "excluded" if excluded_reason else "pending",
+                    excluded_reason,
+                ),
             )
             return int(cursor.lastrowid)
+
+    def mark_protected_overlaps(self) -> int:
+        """Quarantine historical feedback matching protected evaluation splits."""
+
+        if not self.protected_texts:
+            return 0
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id, text FROM feedback WHERE excluded_reason IS NULL"
+            ).fetchall()
+            ids = [
+                int(row["id"])
+                for row in rows
+                if normalize_feedback_text(row["text"]) in self.protected_texts
+            ]
+            connection.executemany(
+                """
+                UPDATE feedback
+                SET review_status = 'excluded',
+                    excluded_reason = 'protected_split_overlap'
+                WHERE id = ?
+                """,
+                ((item_id,) for item_id in ids),
+            )
+        return len(ids)
 
     def next_pending(self) -> FeedbackItem | None:
         """Return the oldest unreviewed item."""
@@ -194,7 +265,7 @@ class FeedbackStore:
                 SELECT id, text, predicted_label, confidence,
                        reviewed_label, reviewed_at, review_status
                 FROM feedback
-                WHERE review_status != 'pending'
+                WHERE review_status IN ('validated', 'deferred')
                 ORDER BY id
                 """
             ).fetchall()
@@ -282,6 +353,8 @@ class FeedbackStore:
                 SELECT reviewed_label, COUNT(*) AS count
                 FROM feedback
                 WHERE reviewed_label IS NOT NULL
+                  AND review_status = 'validated'
+                  AND excluded_reason IS NULL
                 GROUP BY reviewed_label
                 """
             ).fetchall()
@@ -296,6 +369,19 @@ class FeedbackStore:
             )
             for label in LABELS
         }
+
+    def exclusion_counts(self) -> dict[str, int]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT COALESCE(excluded_reason, 'none') AS reason,
+                       COUNT(*) AS count
+                FROM feedback
+                WHERE excluded_reason IS NOT NULL
+                GROUP BY excluded_reason
+                """
+            ).fetchall()
+        return {str(row["reason"]): int(row["count"]) for row in rows}
 
     def annotation_summary(self, audit_path: Path) -> dict[str, dict[str, int]]:
         """Summarize prediction denominators and annotation states by label."""
@@ -358,7 +444,10 @@ class FeedbackStore:
                     """
                     SELECT reviewed_label, COUNT(*) AS count
                     FROM feedback
-                    WHERE reviewed_label IS NOT NULL AND id > ?
+                    WHERE reviewed_label IS NOT NULL
+                      AND review_status = 'validated'
+                      AND excluded_reason IS NULL
+                      AND id > ?
                     GROUP BY reviewed_label
                     """,
                     (feedback_id,),
@@ -368,7 +457,10 @@ class FeedbackStore:
                     """
                     SELECT reviewed_label, COUNT(*) AS count
                     FROM feedback
-                    WHERE reviewed_label IS NOT NULL AND reviewed_at > ?
+                    WHERE reviewed_label IS NOT NULL
+                      AND review_status = 'validated'
+                      AND excluded_reason IS NULL
+                      AND reviewed_at > ?
                     GROUP BY reviewed_label
                     """,
                     (reviewed_after,),

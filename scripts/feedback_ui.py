@@ -32,6 +32,7 @@ def main() -> None:
     )
     thresholds = load_thresholds()
     counts = store.counts()
+    exclusions = store.exclusion_counts()
     annotation = store.annotation_summary(
         Path(os.getenv("AUDIT_DB", "data/audit/predictions.db"))
     )
@@ -43,7 +44,8 @@ def main() -> None:
             Predictions in the configured low-confidence window are also copied
             to this review queue. **Correct** validates the model label, **Wrong**
             records your corrected label, and **I don't know** defers ambiguous
-            text. Only validated labels count toward the retraining thresholds.
+            text. Rows matching protected train, validation, or test splits are
+            quarantined and never count toward retraining thresholds.
             """
         )
 
@@ -53,11 +55,16 @@ def main() -> None:
     suspected = sum(values["suspected"] for values in annotation.values())
     reviewed = sum(values["reviewed"] for values in annotation.values())
     pending = sum(values["pending"] for values in annotation.values())
-    metric_columns = st.columns(4)
+    metric_columns = st.columns(5)
     metric_columns[0].metric("All predictions", total_predictions)
     metric_columns[1].metric("Suspected queue", suspected)
     metric_columns[2].metric("Reviewed", reviewed)
     metric_columns[3].metric("Pending", pending)
+    metric_columns[4].metric(
+        "Protected rows",
+        sum(exclusions.values()),
+        help="Rows excluded because they match a protected data split.",
+    )
 
     st.subheader("Class and annotation progress")
     for label in LABELS:
