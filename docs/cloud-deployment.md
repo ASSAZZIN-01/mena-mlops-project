@@ -155,9 +155,14 @@ MLflow is not an authentication boundary by itself.
 
 ### Publishing a reviewer-safe serving bundle
 
-The current production release is not automatically public. The existing
-public URL used by `scripts/download_model_bundle.py` is a separate sanitized
-fixture and must not be confused with the private release under
+The current production release has a dedicated sanitized public serving
+bundle. Its manifest is:
+
+```text
+https://storage.googleapis.com/mena-mlops-public-models/models/clean-candidate-v21/manifest.json
+```
+
+The release source and all lineage metadata remain private under
 `gs://mena-mlops-project-dvc/vertex-staging/`.
 
 Only publish an approved, immutable serving bundle after deciding that its

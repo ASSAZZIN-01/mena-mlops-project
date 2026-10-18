@@ -33,6 +33,8 @@ Cloud resources, the MLflow VM, Artifact Registry, and Vertex AI deployment are
 documented in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
 The course-rubric evidence map is in
 [`docs/rubric-evidence.md`](docs/rubric-evidence.md).
+The reviewer walkthrough and reproducibility checklist are in
+[`docs/peer-review.md`](docs/peer-review.md).
 
 ## Reviewer quickstart (exactly three commands)
 
@@ -47,9 +49,8 @@ docker compose up --build -d
 The gateway is then available at `http://localhost:8080`. The model bundle
 command retrieves the public reproducibility bundle; private credentials
 are still required for DVC, cloud MLflow artifacts, and Vertex workflows.
-The public bundle is an immutable, sanitized serving bundle. The
-current production release and its MLflow artifacts remain in the private
-release bucket until an operator explicitly publishes a new immutable bundle.
+The public bundle is the immutable, sanitized serving bundle for the current
+production release. Its release lineage and MLflow artifacts remain private.
 The one-command publication helper is
 [`scripts/publish_public_model_bundle.sh`](scripts/publish_public_model_bundle.sh).
 
@@ -81,30 +82,6 @@ flowchart LR
     N --> RC[Release registry and production baseline]
     RC --> CC[MLOps Control Center]
 ```
-
-This diagram covers the course flow from data/versioning and training through
-registry, optimized serving, canary deployment, monitoring, feedback,
-retraining, and release operations.
-
-## Session changelog
-
-- **Session 1 - reproducible data and training:** DVC data stages, typed
-  training code, locked dependencies, and MLflow lineage.
-- **Session 2 - optimization and serving:** ONNX FP32/INT8 variants, CPU-only
-  BentoML serving, scalar inference, vectorized batch inference, and Locust
-  measurements.
-- **Session 3 - production operations:** Nginx stable/candidate routing,
-  canary weights, rollback, audit provenance, Redis feedback, and reviewer
-  workflows.
-- **Session 4 - monitoring and retraining:** Prometheus/Grafana,
-  Evidently/PSI, Airflow scheduling, feedback thresholds, retraining gates,
-  release registry, and deployment identity.
-- **Session 5 - control and evidence:** MLOps Control Center, model cards,
-  release observability, public health contract, PSI Pushgateway publishing,
-  and submission evidence mapping.
-
-The required peer-review artifact is in
-[`docs/peer-review.md`](docs/peer-review.md).
 
 ## Getting started
 

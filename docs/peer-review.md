@@ -1,63 +1,99 @@
-# Peer review
+# Reviewer walkthrough
 
-## Setup and first impression
+This page is the shortest reproducibility path for a reviewer. It explains
+what can be launched without private credentials, where the current release is
+recorded, and which optional cloud workflows require access to the course
+project.
 
-The project has a clear Python package layout under `src/mena_mlops`, a
-versioned `pyproject.toml`, locked dependencies, and a documented Compose
-deployment. The separation between configuration, source code, tests,
-deployment files, and operational documentation makes the repository
-approachable for another engineer. The README now provides a short reviewer
-quickstart, while the longer runbook explains credentials, DVC, MLflow,
-serving, canary control, monitoring, and retraining. The main setup risk is
-that large data and model artifacts are intentionally external, so a reviewer
-must run the documented model-bundle and DVC preparation steps before
-starting the full stack.
+## 1. Launch the public serving stack
 
-## Code quality and architecture
+From a clean checkout with Docker and `uv` installed:
 
-The implementation uses typed request and response models, explicit predictor
-interfaces, deterministic audit records, and focused tests. The system has a
-reasonable production shape: DVC provides data lineage, MLflow tracks
-experiments and model identity, BentoML serves stable and candidate versions,
-Nginx controls canary weights, Redis carries streaming feedback, and
-Prometheus/Grafana plus Evidently/PSI provide operational monitoring. The
-Control Center is a useful addition because it exposes deployment, release,
-reviewer, and retraining state in one place instead of forcing an operator to
-inspect individual databases and containers.
+```bash
+uv sync --locked
+python scripts/download_model_bundle.py
+docker compose up --build -d
+```
 
-## Strengths
+The bundle is the immutable `clean-candidate-v21` ONNX INT8 serving release.
+The download script verifies the SHA-256 manifest before Compose starts. The
+public bundle contains only the model and tokenizer files; datasets, feedback,
+MLflow artifacts, and credentials remain private.
 
-The strongest feature is the end-to-end lifecycle thinking. Predictions are
-audited with model version, source, request identity, and probabilities.
-Batch scoring is vectorized and defaults to audit-only behavior, which avoids
-polluting the human-review queue during offline evaluation. Stable and
-candidate services remain independently routable, so rollback is a router
-operation rather than a destructive model replacement. Quality gates and
-release records also make it possible to explain why a candidate was or was
-not promoted. The project also documents measured scalar and batch latency
-trade-offs instead of presenting batch latency as if it were single-row
-latency.
+Verify the gateway:
 
-## Two improvements
+```bash
+curl --fail http://localhost:8080/health
+curl --fail -X POST http://localhost:8080/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"هذا المنتج ممتاز","source":"live","input_id":"reviewer-1"}'
+```
 
-First, the submission should preserve a small, sanitized evidence bundle
-alongside the code. Large private artifacts should remain in DVC or cloud
-storage, but the exact MLflow run comparison, DVC reproduction output,
-canary/rollback counts, Grafana PSI query, Airflow success, and load-test
-summary should have stable names and locations. This makes the course review
-repeatable without exposing credentials. Second, the production serving
-contract should be made completely explicit. The repository has both scalar
-and vectorized batch APIs, and the public health response is now a JSON
-contract, but the README should clearly distinguish interactive inference,
-offline batch throughput, and any framework-level adaptive batching supported
-by the deployed Bento version.
+Open the local interfaces:
 
-## Extension
+| Interface | URL |
+| --- | --- |
+| Reviewer dashboard | http://localhost:8501 |
+| Control Center | http://localhost:8503 |
+| Feedback reviewer | http://localhost:8503/reviewer |
+| Grafana | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
+| Local MLflow fallback | http://localhost:5000 |
+| Airflow | http://localhost:8081 |
 
-A valuable next extension would be a release-evidence command that collects
-the current Git commit, DVC lock hash, MLflow model version, Prometheus
-queries, canary weights, and benchmark summaries into one signed manifest.
-That manifest could be attached to each release record and verified by CI
-before promotion. It would connect the existing technical components into a
-portable submission and incident-response artifact without copying raw
-Arabic text or secret credentials.
+The Control Center reports local Compose MLflow and, when configured, the
+remote GCP MLflow endpoint separately. The course training runs and registry
+version 21 are hosted at:
+
+```text
+http://34.58.163.106:5000
+```
+
+## 2. Reproduce the quality and serving checks
+
+Run the repository checks:
+
+```bash
+make check
+```
+
+Inspect the current release evidence:
+
+- `docs/evidence/screenshots/11-control-center-clean-release.png`
+- `docs/evidence/screenshots/12-terminal-feedback-exclusions.png`
+- `docs/evidence/screenshots/17-terminal-promotion-gates.png`
+- `docs/evidence/screenshots/19-terminal-production-inference.png`
+- `docs/evidence/screenshots/21-terminal-final-tests.png`
+- `docs/evidence/screenshots/22-terminal-canary-rollout.png`
+- `docs/evidence/screenshots/10-locust-summary.html`
+
+The current production release is `clean-candidate-v21-20261018-134733`,
+serves the `onnx-int8` variant, and is linked to MLflow registered model
+`mena-mlops-arabert` version `21`.
+
+## 3. Review the lifecycle interfaces
+
+The Control Center provides:
+
+- release history and exact gate outcomes;
+- current `ON PROD` model identity and linked release URI;
+- local and remote MLflow health;
+- feedback readiness and protected-row counts;
+- links to the configured MLflow, Airflow, Grafana, and Prometheus services.
+
+The Feedback Reviewer demonstrates human review while protected overlaps with
+train, validation, and test splits remain quarantined and excluded from
+retraining exports. The release registry preserves rejected candidates and
+successful deployment history.
+
+## 4. Optional cloud workflows
+
+DVC reproduction, Vertex retraining, private MLflow artifacts, and Airflow
+automatic retraining require course-project credentials and should not be
+attempted with credentials copied into the repository. Follow
+[`docs/cloud-deployment.md`](cloud-deployment.md) for the GCP setup and
+[`docs/operations-runbook.md`](operations-runbook.md) for retraining,
+promotion, canary, rollback, monitoring, and feedback operations.
+
+Never make the DVC, MLflow artifact, Vertex staging, feedback, or model-card
+locations public. Only the dedicated sanitized serving bundle is public.
