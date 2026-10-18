@@ -66,8 +66,18 @@ Grafana distinguishes live request latency from batch latency. The live
 handles multiple predictions per request. The dashboard therefore reports
 live p50/p95 request latency separately, shows whole-chunk batch latency, and
 reports effective batch latency per prediction using
-`mena_model_batch_row_latency_seconds`. Throughput is displayed as scored
-predictions per second rather than HTTP requests per second.
+`mena_model_batch_row_latency_seconds`. Throughput is available in Prometheus
+for deeper performance analysis, but is intentionally not shown in the
+default dashboard because sparse batch traffic made the visualization
+misleading.
+
+The Grafana **Confidence Stats Per Class** table reports minimum, average, and
+maximum confidence for predictions whose argmax class is the listed class.
+These values are not class probabilities across every prediction. All three
+statistics use the selected Prometheus time range: average uses histogram
+sum/count increases, while minimum and maximum use the observed extrema gauge
+history over that range. This keeps the columns comparable across serving
+process restarts.
 
 The default local traffic split is 95% stable and 5% candidate. It can be
 changed without changing model code:
