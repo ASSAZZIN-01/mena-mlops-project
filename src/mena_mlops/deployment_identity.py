@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -51,7 +52,7 @@ def build_deployment_identity(
         results.get(selected_variant) if isinstance(results, dict) else None
     )
     identity = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "model_id": model_id,
         "model_card_uri": (
             f"{bundle.rstrip('/')}/model-card/model_card.json"
@@ -65,8 +66,17 @@ def build_deployment_identity(
         "selected_variant": selected_variant,
         "deployed_model_gate": decision.get("deployed_model_gate"),
         "deployment_stage": "candidate",
+        "source_revision": os.getenv("GIT_COMMIT_SHA", "unknown"),
+        "training_config_sha256": decision.get("training_config_sha256"),
         "deployed_at": datetime.now(UTC).isoformat(),
     }
+    artifact_name = {
+        "onnx-int8": "model-int8.onnx",
+        "onnx-fp32": "model.onnx",
+    }[selected_variant]
+    artifact_path = output_dir / artifact_name
+    if artifact_path.is_file():
+        identity["artifact_sha256"] = sha256_file(artifact_path)
     if isinstance(selected_result, dict):
         latency = selected_result.get("latency")
         identity["quality_metrics"] = selected_result.get("quality")
