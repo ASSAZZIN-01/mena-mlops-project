@@ -34,6 +34,7 @@ def test_deployment_identity_links_approved_card_and_release(tmp_path: Path) -> 
         "gs://bucket/release/model-card/model_card.json"
     )
     assert len(identity["model_card_sha256"]) == 64
+    assert identity["source_revision"] == "unknown"
     assert identity["deployment_stage"] == "candidate"
 
 
