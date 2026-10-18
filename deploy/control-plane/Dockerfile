@@ -5,6 +5,7 @@ WORKDIR /opt/mena-mlops-project
 RUN pip install --no-cache-dir \
     "fastapi>=0.142.2" \
     "pandas>=2.2" \
+    "pyarrow>=17.0" \
     "pydantic>=2" \
     "pyyaml>=6.0" \
     "uvicorn[standard]>=0.54.0"
