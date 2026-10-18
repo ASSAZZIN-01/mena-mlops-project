@@ -114,6 +114,50 @@ def _release_id_from_decision_uri(uri: str) -> str:
     return parts[-3]
 
 
+def _promote_stable(
+    *,
+    compose: list[str],
+    environment: dict[str, str],
+    candidate_environment: dict[str, str],
+) -> None:
+    """Switch stable only after Compose readiness, restoring the old slot on failure."""
+
+    previous = {
+        key: environment.get(key)
+        for key in (
+            "STABLE_MODEL_PATH",
+            "STABLE_MODEL_FILE",
+            "STABLE_MODEL_VERSION",
+        )
+    }
+    promoted = environment | candidate_environment
+    promoted.update({"STABLE_WEIGHT": "100", "CANDIDATE_WEIGHT": "0"})
+    try:
+        subprocess.run(
+            [*compose, "up", "-d", "--wait", "model-stable", "nginx"],
+            check=True,
+            env=promoted,
+        )
+    except subprocess.CalledProcessError as error:
+        rollback = environment.copy()
+        rollback.update(
+            {
+                key: value
+                for key, value in previous.items()
+                if value is not None
+            }
+        )
+        rollback.update({"STABLE_WEIGHT": "100", "CANDIDATE_WEIGHT": "0"})
+        subprocess.run(
+            [*compose, "up", "-d", "--wait", "model-stable", "nginx"],
+            check=True,
+            env=rollback,
+        )
+        raise RuntimeError(
+            "stable promotion failed; previous stable service was restored"
+        ) from error
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -261,26 +305,15 @@ def main() -> None:
                 check=True,
                 env=environment,
             )
-            promotion_environment = environment.copy()
-            promotion_environment.update(
-                {
-                    "STABLE_MODEL_PATH": str(release_output_dir.resolve()),
-                    "STABLE_MODEL_FILE": model_file,
-                    "STABLE_MODEL_VERSION": model_version,
-                    "STABLE_WEIGHT": "100",
-                    "CANDIDATE_WEIGHT": "0",
-                }
-            )
-            subprocess.run(
-                [
-                    *docker_compose_command(),
-                    "up",
-                    "-d",
-                    "model-stable",
-                    "nginx",
-                ],
-                check=True,
-                env=promotion_environment,
+            promotion_environment = {
+                "STABLE_MODEL_PATH": str(release_output_dir.resolve()),
+                "STABLE_MODEL_FILE": model_file,
+                "STABLE_MODEL_VERSION": model_version,
+            }
+            _promote_stable(
+                compose=docker_compose_command(),
+                environment=environment,
+                candidate_environment=promotion_environment,
             )
             registry.set_model_version_status(model_version, "stable")
             emit_event(
