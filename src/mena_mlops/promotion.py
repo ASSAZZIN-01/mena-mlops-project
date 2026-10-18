@@ -40,7 +40,7 @@ def _evaluate_predictions(
     frame: pd.DataFrame,
 ) -> dict[str, Any]:
     labels = [LABEL_NAMES.index(str(label)) for label in frame["label"]]
-    return evaluate_predictions(predictions, labels, LABEL_NAMES)
+    return evaluate_predictions(labels, predictions, LABEL_NAMES)
 
 
 def _transformer_predictions(
@@ -235,6 +235,39 @@ def evaluate_and_gate_candidate(
             maximum_regression_percent=maximum_deployed_performance_regression_percent,
         )
     )
+    stable_comparison: dict[str, Any] | None = None
+    if deployed_baseline is not None and selected is not None:
+        stable_quality = deployed_baseline.get("quality", {})
+        candidate_result = results[selected]
+        candidate_quality = candidate_result["quality"]
+        stable_comparison = {
+            "stable_model_id": deployed_baseline.get("model_id"),
+            "stable": {
+                "quality": stable_quality,
+                "latency": deployed_baseline.get("latency", {}),
+            },
+            "candidate": {
+                "variant": selected,
+                "quality": candidate_quality,
+                "latency": candidate_result["latency"],
+            },
+            "deltas": {
+                "macro_f1": float(candidate_quality["macro_f1"])
+                - float(stable_quality["macro_f1"]),
+                "latency_mean_ms": float(candidate_result["latency"]["mean_ms"])
+                - float(deployed_baseline["latency"]["mean_ms"]),
+                "throughput_rps": float(
+                    candidate_result["latency"]["throughput_rps"]
+                )
+                - float(deployed_baseline["latency"]["throughput_rps"]),
+                "per_class_f1": {
+                    label: float(candidate_quality["per_class"][label]["f1"])
+                    - float(stable_quality["per_class"][label]["f1"])
+                    for label in stable_quality.get("per_class", {})
+                    if label in candidate_quality.get("per_class", {})
+                },
+            },
+        }
     decision = {
         "status": (
             "approved"
@@ -264,6 +297,7 @@ def evaluate_and_gate_candidate(
         },
         "results": results,
         "stable_macro_f1": stable_macro_f1,
+        "stable_comparison": stable_comparison,
     }
     manifest = {
         "files": {

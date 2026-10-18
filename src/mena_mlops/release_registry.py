@@ -54,6 +54,19 @@ class ReleaseRegistry:
                 );
                 CREATE INDEX IF NOT EXISTS release_events_release_idx
                     ON release_events(release_id, timestamp);
+                CREATE TABLE IF NOT EXISTS model_versions (
+                    version INTEGER PRIMARY KEY,
+                    release_id TEXT NOT NULL UNIQUE,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (release_id) REFERENCES releases(release_id)
+                );
+                CREATE TABLE IF NOT EXISTS model_release_pointers (
+                    name TEXT PRIMARY KEY,
+                    version INTEGER,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (version) REFERENCES model_versions(version)
+                );
                 """
             )
 
@@ -114,6 +127,93 @@ class ReleaseRegistry:
                 "running",
                 payload,
             )
+
+    def allocate_model_version(self, release_id: str) -> str:
+        """Allocate the next immutable deployment version for a release."""
+
+        with self._connect() as connection:
+            existing = connection.execute(
+                "SELECT version FROM model_versions WHERE release_id = ?",
+                (release_id,),
+            ).fetchone()
+            if existing is not None:
+                return f"v{int(existing['version'])}"
+            latest = connection.execute(
+                "SELECT COALESCE(MAX(version), 0) AS version FROM model_versions"
+            ).fetchone()
+            version = int(latest["version"]) + 1
+            connection.execute(
+                """
+                INSERT INTO model_versions
+                    (version, release_id, status, created_at)
+                VALUES (?, ?, 'candidate', ?)
+                """,
+                (version, release_id, utc_now()),
+            )
+        return f"v{version}"
+
+    def set_model_version_status(self, version: str, status: str) -> None:
+        """Update the lifecycle status of an allocated model version."""
+
+        if not version.startswith("v") or not version[1:].isdigit():
+            raise ValueError(f"invalid model version: {version}")
+        with self._connect() as connection:
+            version_number = int(version[1:])
+            if connection.execute(
+                "SELECT 1 FROM model_versions WHERE version = ?",
+                (version_number,),
+            ).fetchone() is None:
+                raise ValueError(f"unknown model version: {version}")
+            if status == "stable":
+                previous = connection.execute(
+                    """
+                    SELECT version FROM model_versions
+                    WHERE status = 'stable' AND version != ?
+                    ORDER BY version DESC LIMIT 1
+                    """,
+                    (version_number,),
+                ).fetchone()
+                connection.execute(
+                    "UPDATE model_versions SET status = 'previous_stable' "
+                    "WHERE status = 'stable' AND version != ?",
+                    (version_number,),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO model_release_pointers(name, version, updated_at)
+                    VALUES ('rollback', ?, ?)
+                    ON CONFLICT(name) DO UPDATE SET
+                        version = excluded.version,
+                        updated_at = excluded.updated_at
+                    """,
+                    (previous["version"] if previous else None, utc_now()),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO model_release_pointers(name, version, updated_at)
+                    VALUES ('stable', ?, ?)
+                    ON CONFLICT(name) DO UPDATE SET
+                        version = excluded.version,
+                        updated_at = excluded.updated_at
+                    """,
+                    (version_number, utc_now()),
+                )
+            connection.execute(
+                "UPDATE model_versions SET status = ? WHERE version = ?",
+                (status, version_number),
+            )
+
+    def get_model_release_pointers(self) -> dict[str, str | None]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT name, version FROM model_release_pointers"
+            ).fetchall()
+        return {
+            str(row["name"]): f"v{int(row['version'])}"
+            if row["version"] is not None
+            else None
+            for row in rows
+        }
 
     def record_decision(
         self,

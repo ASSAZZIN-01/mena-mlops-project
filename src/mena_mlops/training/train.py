@@ -266,6 +266,9 @@ def run_training(config_path: Path) -> str:
                     "gradient_accumulation_steps"
                 ],
                 "epochs": train_config["epochs"],
+                "early_stopping_patience": train_config.get(
+                    "early_stopping_patience"
+                ),
                 "learning_rate": train_config["learning_rate"],
                 "weight_decay": train_config["weight_decay"],
                 "seed": config["seed"],
@@ -290,6 +293,11 @@ def run_training(config_path: Path) -> str:
             }
         )
         best_validation_f1 = -1.0
+        early_stopping_patience = int(
+            train_config.get("early_stopping_patience", 0)
+        )
+        stale_epochs = 0
+        stopped_epoch = int(train_config["epochs"])
         output_dir = Path(config["paths"]["output_dir"])
         for epoch in range(int(train_config["epochs"])):
             train_loss, _, _ = run_epoch(
@@ -317,9 +325,17 @@ def run_training(config_path: Path) -> str:
             )
             if validation["macro_f1"] > best_validation_f1:
                 best_validation_f1 = validation["macro_f1"]
+                stale_epochs = 0
                 output_dir.mkdir(parents=True, exist_ok=True)
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
+            elif early_stopping_patience > 0:
+                stale_epochs += 1
+                if stale_epochs >= early_stopping_patience:
+                    stopped_epoch = epoch + 1
+                    mlflow.log_metric("early_stopped", 1, step=epoch)
+                    break
+        mlflow.log_metric("stopped_epoch", stopped_epoch)
 
         model = AutoModelForSequenceClassification.from_pretrained(
             output_dir

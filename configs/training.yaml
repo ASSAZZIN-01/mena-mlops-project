@@ -9,7 +9,8 @@ training:
   batch_size: 4
   eval_batch_size: 8
   gradient_accumulation_steps: 2
-  epochs: 2
+  epochs: 6
+  early_stopping_patience: 2
   learning_rate: 0.00002
   weight_decay: 0.01
   device: auto

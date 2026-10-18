@@ -38,3 +38,20 @@ def test_registry_persists_decision_gates_and_deployment(tmp_path: Path) -> None
     assert result["decision"]["deployed_model_gate"]["failures"] == [
         "latency regression"
     ]
+
+
+def test_registry_allocates_monotonic_model_versions(tmp_path: Path) -> None:
+    registry = ReleaseRegistry(tmp_path / "releases.db")
+    registry.start_release("release-1", trigger="manual")
+    registry.start_release("release-2", trigger="manual")
+
+    assert registry.allocate_model_version("release-1") == "v1"
+    assert registry.allocate_model_version("release-1") == "v1"
+    assert registry.allocate_model_version("release-2") == "v2"
+
+    registry.set_model_version_status("v1", "stable")
+    registry.set_model_version_status("v2", "stable")
+    assert registry.get_model_release_pointers() == {
+        "stable": "v2",
+        "rollback": "v1",
+    }

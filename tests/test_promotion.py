@@ -1,4 +1,6 @@
-from mena_mlops.promotion import _comparison
+import pandas as pd
+
+from mena_mlops.promotion import _comparison, _evaluate_predictions
 
 
 def test_optimization_comparison_rejects_excessive_quality_drop() -> None:
@@ -18,3 +20,14 @@ def test_optimization_comparison_rejects_excessive_quality_drop() -> None:
     assert "macro-F1 drop 12.50% is not below 5.00%" in (
         comparison["quality_gate_failures"]
     )
+
+
+def test_candidate_evaluation_uses_labels_before_predictions() -> None:
+    result = _evaluate_predictions(
+        [0, 1, 2],
+        pd.DataFrame({"label": ["negative", "neutral", "positive"]}),
+    )
+
+    assert result["per_class"]["negative"]["support"] == 1
+    assert result["per_class"]["neutral"]["support"] == 1
+    assert result["per_class"]["positive"]["support"] == 1

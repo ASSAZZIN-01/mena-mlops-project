@@ -232,12 +232,15 @@ uv run python scripts/deploy_approved_candidate.py \
   --decision gs://mena-mlops-project-dvc/vertex-staging/<job-id>/release/promotion_decision.json
 ```
 
-The command refuses rejected decisions and never changes the stable model
-directory. By default it automatically progresses through 5%, 20%, 50%, and
-100% candidate traffic, observing each stage for ten minutes and rolling back
-to 100% stable on a failed health, error-rate, p95-latency, or prediction
-contract check. Use `--manual-canary` to stop at 5% and control the split
-manually.
+The command refuses rejected decisions and downloads each release into an
+immutable `models/vN/` directory allocated by the release registry. By default
+it automatically progresses through 5%, 20%, 50%, and 100% candidate traffic,
+observing each stage for ten minutes and rolling back to 100% stable on a
+failed health, error-rate, p95-latency, or prediction contract check. After a
+successful non-manual canary, the exact `vN` artifact is mounted into the
+stable service, the stable pointer is advanced, and the previous stable
+version is retained as the rollback pointer. Use `--manual-canary` to stop at
+5% and control the split manually without promotion.
 
 `deployment_identity.json` is the explicit deployment-to-card pointer. It
 records the model ID, model-card URI, model-card SHA-256, release URI,

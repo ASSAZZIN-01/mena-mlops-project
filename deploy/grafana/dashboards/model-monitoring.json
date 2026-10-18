@@ -8,14 +8,15 @@
     {
       "title": "Total predictions",
       "type": "stat",
-      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+      "description": "Total predictions recorded in the selected dashboard time range.",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
       "targets": [
         {
           "expr": "sum(increase(mena_model_predictions_total[$__range]))",
           "legendFormat": "predictions"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "#5794F2"}}},
       "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"}
     },
     {
@@ -68,116 +69,67 @@
     {
       "title": "Prediction share",
       "type": "piechart",
-      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+      "gridPos": {"h": 8, "w": 8, "x": 6, "y": 0},
       "targets": [
         {
-          "expr": "sum(increase(mena_model_predictions_total{label=\"positive\"}[$__range])) or vector(0)",
+          "refId": "A",
+          "expr": "sum by (label) (increase(mena_model_predictions_total{label=~\"positive|negative|neutral\"}[$__range])) or label_replace(vector(0), \"label\", \"positive\", \"\", \"\") or label_replace(vector(0), \"label\", \"negative\", \"\", \"\") or label_replace(vector(0), \"label\", \"neutral\", \"\", \"\")",
           "instant": true,
-          "legendFormat": "positive",
-          "refId": "positive",
-          "format": "time_series"
-        },
-        {
-          "expr": "sum(increase(mena_model_predictions_total{label=\"negative\"}[$__range])) or vector(0)",
-          "instant": true,
-          "legendFormat": "negative",
-          "refId": "negative",
-          "format": "time_series"
-        },
-        {
-          "expr": "sum(increase(mena_model_predictions_total{label=\"neutral\"}[$__range])) or vector(0)",
-          "instant": true,
-          "legendFormat": "neutral",
-          "refId": "neutral",
+          "legendFormat": "{{label}}",
           "format": "time_series"
         }
       ],
       "fieldConfig": {"defaults": {}, "overrides": [
-        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
-        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
-        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
+        {"matcher": {"id": "byRegexpOrNames", "options": ["positive"]}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#56C596"}}]},
+        {"matcher": {"id": "byRegexpOrNames", "options": ["negative"]}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#E86A6A"}}]},
+        {"matcher": {"id": "byRegexpOrNames", "options": ["neutral"]}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#9AA6B2"}}]}
       ]},
       "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
     },
     {
-      "title": "Average confidence by class",
-      "type": "piechart",
-      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+      "title": "Confidence Stats Per Class",
+      "description": "Statistics are calculated on the confidence of predictions whose argmax class is the corresponding row, not across all predictions.",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 10, "x": 14, "y": 0},
       "targets": [
         {
-          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"positive\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"positive\"}[$__range])) or vector(0)",
+          "refId": "A",
+          "expr": "100 * sum by (label) (increase(mena_model_prediction_confidence_sum{label=~\"positive|negative|neutral\"}[$__range])) / clamp_min(sum by (label) (increase(mena_model_prediction_confidence_count{label=~\"positive|negative|neutral\"}[$__range])), 1) or label_replace(vector(0), \"label\", \"positive\", \"\", \"\") or label_replace(vector(0), \"label\", \"negative\", \"\", \"\") or label_replace(vector(0), \"label\", \"neutral\", \"\", \"\")",
           "instant": true,
-          "legendFormat": "positive",
-          "refId": "positive",
+          "legendFormat": "Average Confidence",
           "format": "time_series"
         },
         {
-          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"negative\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"negative\"}[$__range])) or vector(0)",
+          "refId": "B",
+          "expr": "100 * min by (label) (min_over_time(mena_model_prediction_confidence_min{label=~\"positive|negative|neutral\"}[$__range])) and on (label) (sum by (label) (increase(mena_model_prediction_confidence_count{label=~\"positive|negative|neutral\"}[$__range])) > 0) or label_replace(vector(0), \"label\", \"positive\", \"\", \"\") or label_replace(vector(0), \"label\", \"negative\", \"\", \"\") or label_replace(vector(0), \"label\", \"neutral\", \"\", \"\")",
           "instant": true,
-          "legendFormat": "negative",
-          "refId": "negative",
+          "legendFormat": "Min Confidence",
           "format": "time_series"
         },
         {
-          "expr": "100 * sum(increase(mena_model_prediction_confidence_sum{label=\"neutral\"}[$__range])) / sum(increase(mena_model_prediction_confidence_count{label=\"neutral\"}[$__range])) or vector(0)",
+          "refId": "C",
+          "expr": "100 * max by (label) (max_over_time(mena_model_prediction_confidence_max{label=~\"positive|negative|neutral\"}[$__range])) and on (label) (sum by (label) (increase(mena_model_prediction_confidence_count{label=~\"positive|negative|neutral\"}[$__range])) > 0) or label_replace(vector(0), \"label\", \"positive\", \"\", \"\") or label_replace(vector(0), \"label\", \"negative\", \"\", \"\") or label_replace(vector(0), \"label\", \"neutral\", \"\", \"\")",
           "instant": true,
-          "legendFormat": "neutral",
-          "refId": "neutral",
+          "legendFormat": "Max Confidence",
           "format": "time_series"
         }
       ],
-      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1}, "overrides": [
-        {"matcher": {"id": "byName", "options": "positive"}, "properties": [{"id": "color", "value": {"fixed": "#56C596"}}]},
-        {"matcher": {"id": "byName", "options": "negative"}, "properties": [{"id": "color", "value": {"fixed": "#E86A6A"}}]},
-        {"matcher": {"id": "byName", "options": "neutral"}, "properties": [{"id": "color", "value": {"fixed": "#9AA6B2"}}]}
-      ]},
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100, "decimals": 1},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Confidence 1"}, "properties": [{"id": "displayName", "value": "Avg Confidence"}]},
+          {"matcher": {"id": "byName", "options": "Confidence 2"}, "properties": [{"id": "displayName", "value": "Min Confidence"}]},
+          {"matcher": {"id": "byName", "options": "Confidence 3"}, "properties": [{"id": "displayName", "value": "Max Confidence"}]}
+        ]
+      },
       "options": {
-        "legend": {"displayMode": "table", "placement": "right", "values": ["value"]},
-        "pieType": "pie",
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
-      }
-    },
-    {
-      "title": "Scored rows per second",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
-      "targets": [
-        {
-          "expr": "sum(rate(bentoml_service_request_total{endpoint=\"/predict\",http_response_code=\"200\"}[5m]))",
-          "legendFormat": "live rows/s"
-        },
-        {
-          "expr": "sum(rate(mena_model_batch_rows_total[5m]))",
-          "legendFormat": "batch rows/s"
-        }
-      ],
-      "fieldConfig": {"defaults": {"unit": "short", "decimals": 3}},
-      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
-    },
-    {
-      "title": "Batch latency: whole chunk vs effective row",
-      "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
-      "targets": [
-        {
-          "expr": "1000 * sum by (endpoint) (rate(bentoml_service_request_duration_seconds_sum{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])) / sum by (endpoint) (rate(bentoml_service_request_duration_seconds_count{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m]))",
-          "legendFormat": "whole chunk average"
-        },
-        {
-          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint=\"/predict_batch\",http_response_code=\"200\"}[5m])))",
-          "legendFormat": "whole chunk p95"
-        },
-        {
-          "expr": "1000 * sum(rate(mena_model_batch_row_latency_seconds_sum[5m])) / sum(rate(mena_model_batch_row_latency_seconds_count[5m]))",
-          "legendFormat": "effective row average"
-        },
-        {
-          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(mena_model_batch_row_latency_seconds_bucket[5m])))",
-          "legendFormat": "effective row p95"
-        }
-      ],
-      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 1}},
-      "options": {"legend": {"displayMode": "table", "placement": "bottom"}}
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {"id": "joinByLabels", "options": {"value": "label"}},
+        {"id": "transpose", "options": {"firstFieldName": "Class", "restFieldsName": "Confidence"}}
+      ]
     }
   ]
 }

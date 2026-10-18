@@ -166,6 +166,7 @@ def main() -> None:
             },
         )
         raise SystemExit("Refusing deployment: release decision is not approved.")
+    model_version = registry.allocate_model_version(release_id)
     selected_variant = decision.get("selected_variant")
     model_file = {
         "onnx-int8": "model-int8.onnx",
@@ -183,19 +184,23 @@ def main() -> None:
     if bundle is None:
         parser.error("--bundle is required for a local decision file")
 
-    _download_bundle(bundle, args.output_dir)
+    release_output_dir = args.output_dir.parent / model_version
+    _download_bundle(bundle, release_output_dir)
     required = (model_file, "tokenizer.json")
-    missing = [name for name in required if not (args.output_dir / name).is_file()]
+    missing = [
+        name for name in required if not (release_output_dir / name).is_file()
+    ]
     if missing:
         raise RuntimeError(f"release bundle is missing: {', '.join(missing)}")
     identity = build_deployment_identity(
         decision=decision,
         decision_uri=args.decision,
         bundle=bundle,
-        output_dir=args.output_dir,
+        output_dir=release_output_dir,
         selected_variant=str(selected_variant),
     )
-    (args.output_dir / "deployment_identity.json").write_text(
+    identity["deployment_version"] = model_version
+    (release_output_dir / "deployment_identity.json").write_text(
         json.dumps(identity, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
@@ -206,9 +211,10 @@ def main() -> None:
         "deployment",
         status="approved",
         decision_uri=args.decision,
-        output_dir=str(args.output_dir),
+        output_dir=str(release_output_dir),
         selected_variant=selected_variant,
         model_file=model_file,
+        model_version=model_version,
         model_id=identity["model_id"],
         model_card_sha256=identity["model_card_sha256"],
     )
@@ -224,9 +230,9 @@ def main() -> None:
         environment.update(
             {
                 "CANDIDATE_MODEL_BACKEND": "onnx",
-                "CANDIDATE_MODEL_PATH": str(args.output_dir.resolve()),
+                "CANDIDATE_MODEL_PATH": str(release_output_dir.resolve()),
                 "CANDIDATE_MODEL_FILE": model_file,
-                "CANDIDATE_MODEL_VERSION": str(identity["model_id"]),
+                "CANDIDATE_MODEL_VERSION": model_version,
                 "STABLE_WEIGHT": str(stable_percent),
                 "CANDIDATE_WEIGHT": str(args.candidate_percent),
             }
@@ -255,6 +261,37 @@ def main() -> None:
                 check=True,
                 env=environment,
             )
+            promotion_environment = environment.copy()
+            promotion_environment.update(
+                {
+                    "STABLE_MODEL_PATH": str(release_output_dir.resolve()),
+                    "STABLE_MODEL_FILE": model_file,
+                    "STABLE_MODEL_VERSION": model_version,
+                    "STABLE_WEIGHT": "100",
+                    "CANDIDATE_WEIGHT": "0",
+                }
+            )
+            subprocess.run(
+                [
+                    *docker_compose_command(),
+                    "up",
+                    "-d",
+                    "model-stable",
+                    "nginx",
+                ],
+                check=True,
+                env=promotion_environment,
+            )
+            registry.set_model_version_status(model_version, "stable")
+            emit_event(
+                "deployment_release_promoted",
+                "deployment",
+                status="stable",
+                model_version=model_version,
+                rollback_version=registry.get_model_release_pointers().get(
+                    "rollback"
+                ),
+            )
         _write_deployed_baseline(
             decision,
             identity,
@@ -266,6 +303,7 @@ def main() -> None:
             payload={
             "candidate_percent": args.candidate_percent,
             "model_id": identity["model_id"],
+            "model_version": model_version,
             },
         )
         feedback_store = FeedbackStore(
