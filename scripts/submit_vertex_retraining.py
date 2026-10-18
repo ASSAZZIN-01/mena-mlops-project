@@ -176,6 +176,7 @@ def main() -> None:
         for label, value in config["retraining_thresholds"].items()
     }
     store = FeedbackStore(args.database)
+    store.mark_protected_overlaps()
     attempt_checkpoint = store.retraining_checkpoint()
     deployment_checkpoint = store.successful_deployment_checkpoint()
     feedback_upper_bound = store.latest_reviewed_id()
