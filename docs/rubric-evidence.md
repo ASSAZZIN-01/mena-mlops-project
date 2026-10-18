@@ -9,7 +9,7 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Reproducible training | `src/mena_mlops/training/` and `configs/training.yaml` | MLflow run with config, metrics, and data summary |
 | Oversampling | Training-only oversampling in `training/data.py` | Class counts before/after and untouched validation/test counts |
 | Experiment tracking | Compose MLflow server and GCS artifact root | [`04-mlflow-experiment-overview.png`](evidence/screenshots/04-mlflow-experiment-overview.png), [`05-mlflow-distillation-run.png`](evidence/screenshots/05-mlflow-distillation-run.png), plus MLflow/GCS artifact listing |
-| Model registry | MLflow registered model `mena-mlops-arabert` | Registered version and source run shown in [`04-mlflow-experiment-overview.png`](evidence/screenshots/04-mlflow-experiment-overview.png); rejected distillation candidates remain unregistered |
+| Model registry | MLflow registered model `mena-mlops-arabert` | Current production candidate is registry version `21`, source run `clean-candidate-v21`; capture the GCP registry page as `16-mlflow-registry-v21.png`; rejected distillation candidates remain unregistered |
 | Optimization | `build_model_variants.py` and `evaluate_model_variants.py` | FP32/INT8 quality and latency comparison |
 | Serving | BentoML stable and candidate services | Gateway health and prediction response |
 | Batch inference | `run_batch_inference.py` and dashboard upload | CSV result with generated ID and optional source behavior |
@@ -21,7 +21,7 @@ command output, UI screenshot, or CI link attached to the course submission.
 | Leakage control | Protected train/validation/test text fingerprints in feedback storage and export | Quarantined-row count, clean feedback export, and no protected text in retraining input |
 | Auditability | `data/audit/predictions.db` | Live, batch, and stream provenance records |
 | Retraining gate | `configs/feedback.yaml`, dual feedback cursors, and `submit_vertex_retraining.py` | Threshold check, attempt deduplication, successful-deployment progress, and candidate run when thresholds are met |
-| Release observability | Control Center, release registry, and deployed baseline | Release history, gate failure reasons, `ON PROD` state, model identity, p50/p95 latency, and operational links |
+| Release observability | Control Center, release registry, and deployed baseline | Release history, gate failure reasons, `ON PROD` state, model identity, p50/p95 latency, linked release URI, and operational links shown in [`11-control-center-clean-release.png`](evidence/screenshots/11-control-center-clean-release.png) |
 | CI/CD | `.github/workflows/ci.yml` | Passing visible jobs, Compose smoke job, and registry-delivery configuration |
 | Load testing | Locust scalar and batch scenarios | [`10-locust-summary.html`](evidence/screenshots/10-locust-summary.html) plus scalar/batch CSV summaries |
 
@@ -80,6 +80,14 @@ evidence session:
   audit but marked `protected_split_overlap` and excluded from the review queue
   and retraining export. The current audit quarantined 454 rows; the clean
   validated export contains 52 rows.
+- The current deployed release is `clean-candidate-v21-20261018-134733`,
+  serving the `onnx-int8` variant. It is linked to MLflow registered model
+  `mena-mlops-arabert` version `21`, with ONNX INT8 macro-F1 `0.5669`, p95
+  latency `20.44 ms`, and throughput `65.44 req/s`.
+- The Control Center Overview, Retraining & releases, and Deployments views
+  show the current release and its linkage. The Overview evidence must be
+  captured after the release-linkage UI fix is running; the Deployments view
+  is the authoritative detailed release screenshot.
 
 ## Screenshot naming
 
@@ -97,6 +105,16 @@ Use stable names so evidence can be matched to the report:
 08-canary-rollout.png
 09-canary-rollback.png
 10-locust-summary.html
+11-control-center-clean-release.png
+12-terminal-feedback-exclusions.png
+13-feedback-reviewer.png
+16-mlflow-registry-v21.png
+17-terminal-promotion-gates.png
+18-terminal-release-registry-state.png
+19-terminal-production-inference.png
+20-terminal-dvc-status.png
+21-terminal-final-tests.png
+22-terminal-canary-rollout.png
 ```
 
 Screenshots should show the URL or page title where possible. Never include

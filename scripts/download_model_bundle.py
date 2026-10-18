@@ -10,7 +10,7 @@ from urllib.request import urlopen
 
 DEFAULT_BUNDLE_URL = (
     "https://storage.googleapis.com/"
-    "mena-mlops-public-models/models/onnx-int8-v1"
+    "mena-mlops-public-models/models/clean-candidate-v21"
 )
 
 

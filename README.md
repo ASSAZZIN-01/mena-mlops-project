@@ -45,8 +45,13 @@ docker compose up --build -d
 ```
 
 The gateway is then available at `http://localhost:8080`. The model bundle
-command retrieves the public evaluation artifacts only; private credentials
+command retrieves the public reproducibility bundle; private credentials
 are still required for DVC, cloud MLflow artifacts, and Vertex workflows.
+The public bundle is an immutable, sanitized serving bundle. The
+current production release and its MLflow artifacts remain in the private
+release bucket until an operator explicitly publishes a new immutable bundle.
+The one-command publication helper is
+[`scripts/publish_public_model_bundle.sh`](scripts/publish_public_model_bundle.sh).
 
 ## Final architecture
 
@@ -376,7 +381,7 @@ the promoted ONNX or INT8 ONNX deployment representation.
 ### Reviewer model bootstrap
 
 Model files are intentionally not committed to Git. Reviewers can download
-the public promoted INT8 bundle and verify its checksums before starting the
+the public serving fixture and verify its checksums before starting the
 deployment:
 
 ```bash
@@ -415,8 +420,13 @@ All live, batch, and stream predictions are also persisted in the audit
 database at `data/audit/predictions.db`, including their source, input ID,
 model version, probabilities, confidence, and review status.
 
-The download contains only the promoted deployment representation and its
-tokenizer. Private DVC and MLflow artifacts remain in the private GCS bucket.
+The download contains only the public INT8 deployment representation and its
+tokenizer. Private DVC, MLflow, model-card, and current-release artifacts
+remain in the private GCS bucket. To reproduce the exact current production
+release rather than the public fixture, an operator must publish the approved
+`clean-candidate-v21` bundle through the controlled GCP release procedure in
+[`docs/cloud-deployment.md`](docs/cloud-deployment.md); do not make the
+private release bucket public.
 
 Compare the original model with dynamic INT8 quantization:
 
