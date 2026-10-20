@@ -50,8 +50,8 @@ evidence session:
   `trtexec` environment was available for this run, so TensorRT evidence is
   still pending and no synthetic measurements are reported.
 - The required peer-review text is in `docs/peer-review.md`.
-- README contains the exact three-command reviewer quickstart, final
-  architecture diagram, and session changelog.
+- README contains the exact three-command reviewer quickstart and final
+  architecture diagram.
 - The modern React dashboard live evidence is captured in
   `docs/evidence/screenshots/01-dashboard-live-positive.png` and
   `docs/evidence/screenshots/01-dashboard-live-negative.png`; both show a

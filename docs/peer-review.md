@@ -11,7 +11,7 @@ From a clean checkout with Docker and `uv` installed:
 
 ```bash
 uv sync --locked
-python scripts/download_model_bundle.py
+uv run python scripts/download_model_bundle.py
 docker compose up --build -d
 ```
 
@@ -43,10 +43,10 @@ Open the local interfaces:
 
 The Control Center reports local Compose MLflow and, when configured, the
 remote GCP MLflow endpoint separately. The course training runs and registry
-version 21 are hosted at:
+version 21 are hosted at the configured remote MLflow server:
 
 ```text
-http://34.58.163.106:5000
+http://<MLFLOW_VM_EXTERNAL_IP>:5000
 ```
 
 ## 2. Reproduce the quality and serving checks
@@ -67,7 +67,7 @@ Inspect the current release evidence:
 - `docs/evidence/screenshots/22-terminal-canary-rollout.png`
 - `docs/evidence/screenshots/10-locust-summary.html`
 
-The current production release is `clean-candidate-v21-20261018-134733`,
+The recorded production release is `clean-candidate-v21-20261018-134733`,
 serves the `onnx-int8` variant, and is linked to MLflow registered model
 `mena-mlops-arabert` version `21`.
 

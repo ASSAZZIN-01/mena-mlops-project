@@ -42,7 +42,7 @@ From a clean checkout with Docker and `uv` installed:
 
 ```bash
 uv sync --locked
-python scripts/download_model_bundle.py
+uv run python scripts/download_model_bundle.py
 docker compose up --build -d
 ```
 
@@ -139,12 +139,6 @@ training.
 Exact normalized-text duplicates with conflicting labels are removed entirely;
 they are not assigned an arbitrary surviving label. Other exact duplicates keep
 one row after this conflict filter.
-
-## Course reference
-
-The course examples and handbooks used to shape this scaffold are kept
-outside this repository in
-`/home/az-wsl/projects/mlops-course-ressources`.
 
 ## Data and secrets
 
