@@ -16,13 +16,14 @@ stable production service:
 ```text
 stable   = models/arabert-debug-variants/model-int8.onnx
 candidate = independently configured ONNX model version
-rollback = models/arabert-debug (canonical PyTorch model)
+rollback = the previous approved serving artifact
 ```
 
 Stable and candidate are model lifecycle slots, not permanently different
 frameworks. A future candidate can be tested and promoted without changing the
-production routing contract. To roll back to PyTorch, set
-`STABLE_MODEL_BACKEND=pytorch` and `STABLE_MODEL_PATH=./models/arabert-debug`.
+production routing contract. Rollback restores the previous approved serving
+bundle through the router; the canonical PyTorch model remains a training and
+reference artifact rather than an implicit rollback target.
 
 ## Offline quality and single-request CPU latency
 

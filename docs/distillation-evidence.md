@@ -8,18 +8,12 @@ KL divergence.
 
 ## Reproducible configuration
 
-The reference implementation and configuration are committed in the Raay
-course reference repository:
-
-- Configuration: `configs/distill.yaml`
-- Teacher: `models/baseline/final`
-- Student layer count: `6`
-- Evaluation report: `reports/eval_distilled.json`
-- Distillation evaluation commit: `15d168d`
-
-The construction logic is implemented in
-`src/raay/training/distill_models.py`, where the student configuration sets
-`num_hidden_layers` to the configured six-layer value.
+The project configuration for the Vertex experiment is committed in
+`configs/distillation.yaml`. It defines the 12-layer AraBERT teacher, the
+6-layer student, the distillation temperature, the loss weight, the learning
+rate, and the early-stopping settings. The resulting student artifact is
+stored in the recorded Vertex staging location below and is evaluated through
+the same project quality and optimization gates as other candidates.
 
 ## Recorded evaluation
 
@@ -38,7 +32,7 @@ artifacts rather than being duplicated in this repository.
 
 ## Project Vertex experiment
 
-The project now contains a reproducible Vertex AI experiment using the shared
+The project contains a reproducible Vertex AI experiment using the shared
 CUDA training image:
 
 - Vertex job: `projects/922483082863/locations/us-central1/customJobs/2307246063360147456`

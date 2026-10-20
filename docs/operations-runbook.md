@@ -291,10 +291,10 @@ socket so its deployment task can update the candidate and Nginx services.
 configuration uses the host's standalone `docker-compose` binary.
 
 The deployment command requires the host environment to load the project
-credentials before reading a GCS release:
+credentials before reading a GCS release. Use the credential-loading method
+appropriate for your workstation, then export the variables from `.env`:
 
 ```bash
-source /home/az-wsl/setup_env.sh
 set -a
 source .env
 set +a
