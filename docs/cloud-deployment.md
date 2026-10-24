@@ -153,6 +153,42 @@ The initial demonstration can allow TCP port 5000 from the internet, but this
 should be replaced with HTTPS and authentication before a public deployment.
 MLflow is not an authentication boundary by itself.
 
+### Data and cloud credential prerequisites
+
+The public reviewer quickstart does not require any of the credentials in this
+section. They are required only for reproducing the private data, training, and
+cloud retraining workflows.
+
+- `GOOGLE_APPLICATION_CREDENTIALS` must point to a local service-account JSON
+  with access to the configured DVC and MLflow GCS locations. The file must
+  remain outside Git and must never be pasted into chat, issues, or logs.
+- `HF_API_TOKEN` is a Hugging Face access token used when the data pipeline
+  downloads protected Hugging Face assets. A read-only token is sufficient.
+- `KAGGLE_API_TOKEN` is the Kaggle API token used when the data pipeline
+  downloads Kaggle assets. Create it from the Kaggle account settings and
+  store it only in the local `.env`.
+- `VERTEX_PROJECT_ID`, `VERTEX_REGION`, `VERTEX_TRAINING_IMAGE_URI`, and
+  `VERTEX_STAGING_BUCKET` identify the Vertex job, training image, and staging
+  location. The submitting identity needs the IAM roles listed in Sections 1
+  and 2.
+- `MLFLOW_TRACKING_URI` must point to the cloud-reachable MLflow VM for Vertex
+  jobs. `localhost` is valid only for local processes and cannot be used by a
+  Vertex worker.
+
+Copy `.env.example` to `.env`, fill only the values needed for the workflow,
+and verify variable names without printing values:
+
+```bash
+cp .env.example .env
+for key in GOOGLE_APPLICATION_CREDENTIALS HF_API_TOKEN KAGGLE_API_TOKEN \
+  VERTEX_PROJECT_ID VERTEX_STAGING_BUCKET MLFLOW_TRACKING_URI; do
+  grep -q "^${key}=" .env && echo "$key: present" || echo "$key: missing"
+done
+```
+
+Do not share credentials with reviewers through the repository. The public
+serving bundle is sufficient for clean-machine inference and monitoring.
+
 ### Publishing a reviewer-safe serving bundle
 
 The current production release has a dedicated sanitized public serving
